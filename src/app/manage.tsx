@@ -15,7 +15,7 @@ export default function Manage() {
 
   return (
     <ScrollView contentContainerStyle={styles.page}>
-      <Section title="Home" tint={colors.teal} items={home} />
+      <Section title="Home" tint={colors.blueDark} items={home} />
       <Section title="School" tint={colors.school} items={school} />
       <Button label="Add an activity" onPress={() => router.push('/activity-form')} />
 

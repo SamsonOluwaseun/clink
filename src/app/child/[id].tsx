@@ -84,7 +84,7 @@ export default function ChildScreen() {
               accessibilityRole="button"
               onPress={() => router.push({ pathname: '/child-form', params: { id: child.id } })}
               hitSlop={10}>
-              <Text variant="label" style={{ color: colors.tealDark }}>Edit</Text>
+              <Text variant="label" style={{ color: colors.blueDark }}>Edit</Text>
             </Pressable>
           ),
         }}
@@ -108,7 +108,7 @@ export default function ChildScreen() {
 
           <View style={styles.actions}>
             <Button
-              kind="gold"
+              kind="lime"
               label="Give a reward"
               style={{ flex: 1 }}
               onPress={() => router.push({ pathname: '/reward', params: { childId: child.id } })}
@@ -127,8 +127,8 @@ export default function ChildScreen() {
           <Card>
             <Text variant="heading">This week</Text>
             <View style={styles.split}>
-              <View style={[styles.pill, { backgroundColor: colors.tealSoft }]}>
-                <Text variant="label" style={{ color: colors.tealDark }}>Home</Text>
+              <View style={[styles.pill, { backgroundColor: colors.blueSoft }]}>
+                <Text variant="label" style={{ color: colors.blueDark }}>Home</Text>
                 <Text style={styles.pillValue}>{formatPence(week.home)}</Text>
               </View>
               <View style={[styles.pill, { backgroundColor: colors.schoolSoft }]}>
@@ -149,7 +149,7 @@ export default function ChildScreen() {
               accessibilityHint={e.type === 'reward' && !e.undone ? 'Long press to undo' : undefined}
               onLongPress={() => e.type === 'reward' && !e.undone && confirmUndo(e)}
               style={styles.entry}>
-              <View style={[styles.dot, { backgroundColor: e.type === 'purchase' ? colors.navy : e.environment === 'school' ? colors.school : colors.teal }]} />
+              <View style={[styles.dot, { backgroundColor: e.type === 'purchase' ? colors.limeDeep : e.environment === 'school' ? colors.school : colors.blue }]} />
               <View style={{ flex: 1 }}>
                 <Text style={[{ fontSize: 16 }, e.undone ? styles.struck : null]}>{e.title}</Text>
                 <Text variant="small">
@@ -174,7 +174,7 @@ export default function ChildScreen() {
             <Text variant="heading">Goals reached</Text>
             {bought.map((g) => (
               <View key={g.id} style={styles.boughtRow}>
-                <Avatar name="★" colour={colors.gold} size={34} />
+                <Avatar name="★" colour={colors.lime} size={34} />
                 <Text style={{ flex: 1 }}>{g.title}</Text>
                 <Text variant="small">{formatPence(g.target_pence)}</Text>
               </View>

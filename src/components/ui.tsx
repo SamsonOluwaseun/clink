@@ -13,14 +13,14 @@ import {
   type ViewStyle,
 } from 'react-native';
 
-import { colors, fonts, radius } from '@/lib/theme';
+import { colors, fonts, radius, textOn } from '@/lib/theme';
 
 type Variant = 'title' | 'heading' | 'body' | 'label' | 'small';
 
 const textStyles: Record<Variant, TextStyle> = {
-  title: { fontFamily: fonts.bold, fontSize: 30, color: colors.navy },
+  title: { fontFamily: fonts.bold, fontSize: 28, color: colors.navy },
   heading: { fontFamily: fonts.semibold, fontSize: 20, color: colors.navy },
-  body: { fontFamily: fonts.regular, fontSize: 17, color: colors.ink },
+  body: { fontFamily: fonts.regular, fontSize: 16, color: colors.ink },
   label: { fontFamily: fonts.medium, fontSize: 15, color: colors.muted },
   small: { fontFamily: fonts.regular, fontSize: 14, color: colors.muted },
 };
@@ -38,9 +38,9 @@ export function Button({
   kind = 'primary',
   style,
   ...rest
-}: PressableProps & { label: string; kind?: 'primary' | 'gold' | 'ghost' | 'danger'; style?: StyleProp<ViewStyle> }) {
-  const bg = { primary: colors.teal, gold: colors.gold, ghost: 'transparent', danger: 'transparent' }[kind];
-  const fg = { primary: '#FFFFFF', gold: colors.navy, ghost: colors.tealDark, danger: colors.danger }[kind];
+}: PressableProps & { label: string; kind?: 'primary' | 'lime' | 'ghost' | 'danger'; style?: StyleProp<ViewStyle> }) {
+  const bg = { primary: colors.navy, lime: colors.lime, ghost: 'transparent', danger: 'transparent' }[kind];
+  const fg = { primary: colors.cream, lime: colors.navy, ghost: colors.blueDark, danger: colors.danger }[kind];
   return (
     <Pressable
       accessibilityRole="button"
@@ -48,7 +48,7 @@ export function Button({
       style={({ pressed }) => [
         styles.button,
         { backgroundColor: bg, opacity: rest.disabled ? 0.45 : pressed ? 0.8 : 1 },
-        kind === 'ghost' && { borderWidth: 2, borderColor: colors.tealSoft },
+        kind === 'ghost' && { borderWidth: 2, borderColor: colors.blue },
         style,
       ]}>
       <RNText style={[styles.buttonText, { color: fg }]}>{label}</RNText>
@@ -56,14 +56,14 @@ export function Button({
   );
 }
 
-export function Chip({ label, selected, onPress, tint = colors.teal }: { label: string; selected: boolean; onPress: () => void; tint?: string }) {
+export function Chip({ label, selected, onPress, tint = colors.blueDark }: { label: string; selected: boolean; onPress: () => void; tint?: string }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityState={{ selected }}
       onPress={onPress}
       style={[styles.chip, selected ? { backgroundColor: tint, borderColor: tint } : null]}>
-      <RNText style={[styles.chipText, selected && { color: '#FFFFFF' }]}>{label}</RNText>
+      <RNText style={[styles.chipText, selected && { color: textOn(tint) }]}>{label}</RNText>
     </Pressable>
   );
 }
@@ -80,12 +80,12 @@ export function Field({ label, ...rest }: TextInputProps & { label: string }) {
 export function Avatar({ name, colour, size = 52 }: { name: string; colour: string; size?: number }) {
   return (
     <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colour, alignItems: 'center', justifyContent: 'center' }}>
-      <RNText style={{ fontFamily: fonts.bold, color: '#FFFFFF', fontSize: size * 0.42 }}>{name.slice(0, 1).toUpperCase()}</RNText>
+      <RNText style={{ fontFamily: fonts.bold, color: textOn(colour), fontSize: size * 0.42 }}>{name.slice(0, 1).toUpperCase()}</RNText>
     </View>
   );
 }
 
-export function ProgressBar({ value, colour = colors.gold }: { value: number; colour?: string }) {
+export function ProgressBar({ value, colour = colors.blue }: { value: number; colour?: string }) {
   const pct = Math.max(0, Math.min(1, value));
   return (
     <View style={styles.track}>
@@ -119,6 +119,6 @@ const styles = StyleSheet.create({
     fontSize: 17,
     color: colors.navy,
   },
-  track: { height: 14, borderRadius: 7, backgroundColor: colors.goldSoft, overflow: 'hidden' },
+  track: { height: 14, borderRadius: 7, backgroundColor: colors.blueSoft, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 7 },
 });

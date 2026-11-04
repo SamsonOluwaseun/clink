@@ -80,7 +80,7 @@ export default function RewardScreen() {
                 key={a.id}
                 label={`${a.title} · ${formatPence(a.default_pence)}`}
                 selected={activity?.id === a.id}
-                tint={env === 'school' ? colors.school : colors.teal}
+                tint={env === 'school' ? colors.school : colors.blue}
                 onPress={() => pickActivity(a)}
               />
             ))}
@@ -127,7 +127,7 @@ export default function RewardScreen() {
           </View>
         )}
 
-        <Button kind="gold" label="Clink it in" disabled={!ready} onPress={give} />
+        <Button kind="lime" label="Clink it in" disabled={!ready} onPress={give} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -137,5 +137,5 @@ const styles = StyleSheet.create({
   page: { padding: 16, gap: 22, paddingBottom: 48 },
   section: { gap: 10 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  preview: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.goldSoft, borderRadius: 18, padding: 12 },
+  preview: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.limeSoft, borderRadius: 18, padding: 12 },
 });

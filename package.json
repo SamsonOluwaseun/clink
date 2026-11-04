@@ -1,9 +1,9 @@
 {
   "name": "clink",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "main": "expo-router/entry",
   "dependencies": {
-    "@expo-google-fonts/fredoka": "^0.4.1",
+    "@expo-google-fonts/montserrat": "^0.4.2",
     "@expo/ui": "~58.0.27",
     "eslint-config-expo": "~58.0.4",
     "expo": "~58.0.23",

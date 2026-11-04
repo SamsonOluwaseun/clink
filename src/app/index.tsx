@@ -21,7 +21,7 @@ export default function Home() {
             <CoinLogo size={26} />
           </View>
           <Pressable accessibilityRole="button" onPress={() => router.push('/manage')} style={styles.manage}>
-            <Text variant="label" style={{ color: colors.tealDark }}>Activities</Text>
+            <Text variant="label" style={{ color: colors.blueDark }}>Activities</Text>
           </Pressable>
         </View>
 
@@ -65,7 +65,7 @@ function ChildCard({ child }: { child: ChildSummary }) {
           </View>
         )}
         <Button
-          kind="gold"
+          kind="lime"
           label="Give a reward"
           onPress={() => router.push({ pathname: '/reward', params: { childId: child.id } })}
         />
@@ -92,7 +92,7 @@ const styles = StyleSheet.create({
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 4 },
   brand: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   wordmark: { fontFamily: fonts.bold, fontSize: 40, color: colors.navy, letterSpacing: -0.5 },
-  manage: { minHeight: 44, paddingHorizontal: 14, justifyContent: 'center', borderRadius: 22, backgroundColor: colors.tealSoft },
+  manage: { minHeight: 44, paddingHorizontal: 14, justifyContent: 'center', borderRadius: 22, backgroundColor: colors.blueSoft },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   balance: { fontFamily: fonts.bold, fontSize: 26, color: colors.navy },
 });
