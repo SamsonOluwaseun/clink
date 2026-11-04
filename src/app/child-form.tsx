@@ -5,6 +5,7 @@ import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Button, Field, Text } from '@/components/ui';
 import { addChild, getChild, removeChild, updateChild } from '@/lib/db';
 import { useDb, useRefresh } from '@/lib/data';
+import { pickChildPhoto } from '@/lib/photos';
 import { avatarColours, colors } from '@/lib/theme';
 
 export default function ChildForm() {
@@ -13,6 +14,8 @@ export default function ChildForm() {
   const refresh = useRefresh();
   const [name, setName] = useState('');
   const [colour, setColour] = useState(avatarColours[0]);
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -20,19 +23,30 @@ export default function ChildForm() {
       if (c) {
         setName(c.name);
         setColour(c.colour);
+        setPhoto(c.photo);
       }
     });
   }, [db, id]);
 
+  const choosePhoto = async () => {
+    setBusy(true);
+    try {
+      const p = await pickChildPhoto();
+      if (p) setPhoto(p);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const save = async () => {
     if (!name.trim()) return;
     if (id) {
-      await updateChild(db, id, name, colour);
+      await updateChild(db, id, name, colour, photo);
       refresh();
       router.back();
       return;
     }
-    const newId = await addChild(db, name, colour);
+    const newId = await addChild(db, name, colour, photo);
     refresh();
     // Straight on to their first goal
     router.replace({ pathname: '/goal', params: { childId: newId, first: '1' } });
@@ -56,12 +70,18 @@ export default function ChildForm() {
 
   return (
     <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
-      <View style={{ alignItems: 'center' }}>
-        <Avatar name={name || '?'} colour={colour} size={84} />
+      <View style={{ alignItems: 'center', gap: 10 }}>
+        <Pressable accessibilityRole="button" accessibilityLabel={photo ? 'Change photo' : 'Add a photo'} onPress={choosePhoto} disabled={busy}>
+          <Avatar name={name || '?'} colour={colour} photo={photo} size={104} />
+        </Pressable>
+        <View style={styles.photoActions}>
+          <Button kind="ghost" label={photo ? 'Change photo' : 'Add a photo'} onPress={choosePhoto} disabled={busy} style={{ minHeight: 44 }} />
+          {photo && <Button kind="danger" label="Remove photo" onPress={() => setPhoto(null)} style={{ minHeight: 44 }} />}
+        </View>
       </View>
       <Field label="Name" placeholder="e.g. Tobi" value={name} onChangeText={setName} autoFocus={!id} autoCapitalize="words" />
       <View style={{ gap: 10 }}>
-        <Text variant="label">Colour</Text>
+        <Text variant="label">{photo ? 'Colour (used behind the photo)' : 'Colour'}</Text>
         <View style={styles.colours}>
           {avatarColours.map((c) => (
             <Pressable
@@ -70,7 +90,7 @@ export default function ChildForm() {
               accessibilityLabel={`Colour ${c}`}
               accessibilityState={{ selected: c === colour }}
               onPress={() => setColour(c)}
-              style={[styles.swatch, { backgroundColor: c }, c === colour && styles.swatchOn]}
+              style={[styles.swatch, { backgroundColor: c }, c === colour && [styles.swatchOn, c === colors.navy && { borderColor: colors.blue }]]}
             />
           ))}
         </View>
@@ -83,6 +103,7 @@ export default function ChildForm() {
 
 const styles = StyleSheet.create({
   page: { padding: 16, gap: 22, paddingBottom: 48 },
+  photoActions: { flexDirection: 'row', gap: 10 },
   colours: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
   swatch: { width: 48, height: 48, borderRadius: 24 },
   swatchOn: { borderWidth: 4, borderColor: colors.navy },

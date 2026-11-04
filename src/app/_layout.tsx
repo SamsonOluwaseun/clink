@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 
 import { DataProvider } from '@/lib/data';
+import { SyncProvider } from '@/lib/sync';
 import { colors, fonts } from '@/lib/theme';
 
 SplashScreen.preventAutoHideAsync();
@@ -20,6 +21,7 @@ export default function RootLayout() {
 
   return (
     <DataProvider>
+      <SyncProvider>
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
@@ -37,7 +39,10 @@ export default function RootLayout() {
         <Stack.Screen name="goal" options={{ presentation: 'modal', title: 'Goal' }} />
         <Stack.Screen name="manage" options={{ title: 'Activities and children' }} />
         <Stack.Screen name="activity-form" options={{ presentation: 'modal', title: 'Activity' }} />
+        <Stack.Screen name="sync" options={{ title: 'Family sync' }} />
+        <Stack.Screen name="scan" options={{ title: 'Scan pairing code' }} />
       </Stack>
+      </SyncProvider>
     </DataProvider>
   );
 }

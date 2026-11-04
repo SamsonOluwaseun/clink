@@ -13,6 +13,9 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import { Image } from 'expo-image';
+
+import { SamlyticsMark } from '@/components/samlytics-mark';
 import { colors, fonts, radius, textOn } from '@/lib/theme';
 
 type Variant = 'title' | 'heading' | 'body' | 'label' | 'small';
@@ -77,10 +80,33 @@ export function Field({ label, ...rest }: TextInputProps & { label: string }) {
   );
 }
 
-export function Avatar({ name, colour, size = 52 }: { name: string; colour: string; size?: number }) {
+export function Avatar({ name, colour, photo, size = 52 }: { name: string; colour: string; photo?: string | null; size?: number }) {
+  const shape = { width: size, height: size, borderRadius: size / 2 };
+  if (photo) {
+    return (
+      <Image
+        source={{ uri: `data:image/jpeg;base64,${photo}` }}
+        style={[shape, { backgroundColor: colour }]}
+        contentFit="cover"
+        accessibilityLabel={`Photo of ${name}`}
+      />
+    );
+  }
   return (
-    <View style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: colour, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={[shape, { backgroundColor: colour, alignItems: 'center', justifyContent: 'center' }]}>
       <RNText style={{ fontFamily: fonts.bold, color: textOn(colour), fontSize: size * 0.42 }}>{name.slice(0, 1).toUpperCase()}</RNText>
+    </View>
+  );
+}
+
+// Shown at the foot of the main screens
+export function PoweredBy() {
+  return (
+    <View style={styles.powered} accessibilityRole="text" accessibilityLabel="Powered by Samlytics Data Services">
+      <SamlyticsMark size={18} />
+      <RNText style={styles.poweredText}>
+        Powered by <RNText style={{ fontFamily: fonts.bold, color: colors.navy }}>Samlytics Data Services</RNText>
+      </RNText>
     </View>
   );
 }
@@ -121,4 +147,6 @@ const styles = StyleSheet.create({
   },
   track: { height: 14, borderRadius: 7, backgroundColor: colors.blueSoft, overflow: 'hidden' },
   fill: { height: '100%', borderRadius: 7 },
+  powered: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingVertical: 12 },
+  poweredText: { fontFamily: fonts.regular, fontSize: 13, color: colors.muted },
 });

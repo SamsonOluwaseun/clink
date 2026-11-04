@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import { Avatar, Button, Card, Text } from '@/components/ui';
+import { Avatar, Button, Card, PoweredBy, Text } from '@/components/ui';
 import { listActivities, listChildren, type Activity } from '@/lib/db';
 import { useQuery } from '@/lib/data';
 import { formatPence } from '@/lib/money';
@@ -27,13 +27,14 @@ export default function Manage() {
             accessibilityRole="button"
             onPress={() => router.push({ pathname: '/child-form', params: { id: c.id } })}
             style={styles.row}>
-            <Avatar name={c.name} colour={c.colour} size={36} />
+            <Avatar name={c.name} colour={c.colour} photo={c.photo} size={36} />
             <Text style={{ flex: 1 }}>{c.name}</Text>
             <Text variant="small">Edit</Text>
           </Pressable>
         ))}
         <Button kind="ghost" label="Add a child" onPress={() => router.push('/child-form')} style={{ marginTop: 8 }} />
       </Card>
+      <PoweredBy />
     </ScrollView>
   );
 }

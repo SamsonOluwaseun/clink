@@ -120,7 +120,7 @@ export default function RewardScreen() {
 
         {child && amount != null && amount > 0 && (
           <View style={styles.preview}>
-            <Avatar name={child.name} colour={child.colour} size={40} />
+            <Avatar name={child.name} colour={child.colour} photo={child.photo} size={40} />
             <Text style={{ flex: 1 }}>
               {`${formatPence(amount)} into ${child.name}'s jar`}
             </Text>
