@@ -13,6 +13,8 @@
   <a href="https://github.com/SamsonOluwaseun/clink/releases/latest/download/clink.apk"><strong>Download for Android</strong></a>
   ·
   <a href="https://github.com/SamsonOluwaseun/clink/releases">All releases</a>
+  ·
+  £ $ ₦
 </p>
 
 <p align="center"><sub>Powered by <strong>Samlytics Data Services</strong></sub></p>
@@ -39,10 +41,14 @@ An iPhone version is planned. Installing apps outside the App Store on iPhone ne
 
 ## What it does
 
+- **Children on the home screen.** Every child is listed on the first page with their savings, goal and buttons to reward, give, set goals or edit. A child can only be added once, and if a name does appear twice (for example, added on both phones before pairing), Clink offers to combine them.
 - **Children.** Add each child with their own photo and colour.
 - **Goals.** Set something for each child to save for, such as a toy plane for £15. Add more goals to a queue, edit or delete them, and choose which one savings go to first.
 - **Home and school activities.** Ten starter activities, from "Tidied bedroom" to "Reached ClassDojo points", each with a usual reward. Add, edit or remove your own.
-- **Quick rewards.** Pick the child, the activity and the amount, add an optional note, and clink it into the jar.
+- **Quick rewards.** Pick the child, the day (today or any of the last six days), the activity and the amount, add an optional note, and clink it into the jar.
+- **Weekly report.** Each child's earnings day by day, home and school totals, gifts given and savings so far. Step back through earlier weeks and share the report as a message.
+- **Tithes and offerings.** Children learn to give from their own savings. Clink explains a tithe (a tenth of what you earn) and an offering (a gift you choose) in simple words, suggests the tithe from this week's earnings, and records each gift so the parent can withdraw it and pay it in.
+- **Four currencies.** Pound sterling, US dollar, Canadian dollar and Nigerian naira, picked from the phone's region on first launch and changeable in Settings. Paired phones share the same currency.
 - **Progress.** A jar that fills as the child gets closer, this week's home and school totals, and the full history.
 - **Undo.** Long press any reward in the history to undo it.
 - **Goal reached.** Tap "We bought it" and take a photo of your child with it. The photo is saved to a **Clink** album in your phone's gallery and kept in the app. The cost comes out of the jar, and anything extra carries over to the next goal.

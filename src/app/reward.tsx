@@ -4,21 +4,22 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Avatar, Button, Chip, Field, Text } from '@/components/ui';
+import { addDays, dayLabel, localDay } from '@/lib/dates';
 import { giveReward, listActivities, listChildren, type Activity, type Environment } from '@/lib/db';
 import { useDb, useQuery, useRefresh } from '@/lib/data';
-import { formatPence, parseToPence, quickAmounts } from '@/lib/money';
+import { formatMoney, money, parseMoney } from '@/lib/money';
 import { colors } from '@/lib/theme';
 
 export default function RewardScreen() {
   const params = useLocalSearchParams<{ childId?: string }>();
   const db = useDb();
   const refresh = useRefresh();
+  const cur = money();
 
   const children = useQuery(listChildren);
   const [picked, setPicked] = useState<string | undefined>(params.childId);
   // Only one child? Pick them automatically.
   const childId = picked ?? (children?.length === 1 ? children[0].id : undefined);
-  const setChildId = setPicked;
   const [env, setEnv] = useState<Environment>('home');
   const activities = useQuery((d) => listActivities(d, env), [env]);
   const [activity, setActivity] = useState<Activity | null>(null);
@@ -26,7 +27,10 @@ export default function RewardScreen() {
   const [pence, setPence] = useState<number | null>(null);
   const [amountText, setAmountText] = useState('');
   const [note, setNote] = useState('');
+  const today = localDay();
+  const [day, setDay] = useState(today);
   const [saving, setSaving] = useState(false);
+  const days = Array.from({ length: 7 }, (_, i) => addDays(today, -i));
 
   const pickActivity = (a: Activity) => {
     setActivity(a);
@@ -36,7 +40,7 @@ export default function RewardScreen() {
   };
 
   const title = activity?.title ?? custom.trim();
-  const typed = amountText ? parseToPence(amountText) : null;
+  const typed = amountText ? parseMoney(amountText) : null;
   const amount = typed ?? pence;
   const ready = !!childId && title.length > 0 && amount != null && amount > 0 && !saving;
   const child = children?.find((c) => c.id === childId);
@@ -44,7 +48,7 @@ export default function RewardScreen() {
   const give = async () => {
     if (!ready || !childId || amount == null) return;
     setSaving(true);
-    await giveReward(db, { childId, activity, title, environment: env, pence: amount, note });
+    await giveReward(db, { childId, activity, title, environment: env, pence: amount, note, forDate: day });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     refresh();
     router.back();
@@ -58,11 +62,20 @@ export default function RewardScreen() {
             <Text variant="label">Who for?</Text>
             <View style={styles.wrap}>
               {children.map((c) => (
-                <Chip key={c.id} label={c.name} selected={c.id === childId} tint={c.colour} onPress={() => setChildId(c.id)} />
+                <Chip key={c.id} label={c.name} selected={c.id === childId} tint={c.colour} onPress={() => setPicked(c.id)} />
               ))}
             </View>
           </View>
         )}
+
+        <View style={styles.section}>
+          <Text variant="label">When?</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+            {days.map((d) => (
+              <Chip key={d} label={dayLabel(d)} selected={d === day} tint={colors.navy} onPress={() => setDay(d)} />
+            ))}
+          </ScrollView>
+        </View>
 
         <View style={styles.section}>
           <Text variant="label">Where?</Text>
@@ -78,9 +91,9 @@ export default function RewardScreen() {
             {activities?.map((a) => (
               <Chip
                 key={a.id}
-                label={`${a.title} · ${formatPence(a.default_pence)}`}
+                label={`${a.title} · ${formatMoney(a.default_pence)}`}
                 selected={activity?.id === a.id}
-                tint={env === 'school' ? colors.school : colors.blue}
+                tint={env === 'school' ? colors.school : colors.blueDark}
                 onPress={() => pickActivity(a)}
               />
             ))}
@@ -99,10 +112,10 @@ export default function RewardScreen() {
         <View style={styles.section}>
           <Text variant="label">How much?</Text>
           <View style={styles.wrap}>
-            {quickAmounts.map((p) => (
+            {cur.quick.map((p) => (
               <Chip
                 key={p}
-                label={formatPence(p)}
+                label={formatMoney(p)}
                 selected={!amountText && pence === p}
                 tint={colors.navy}
                 onPress={() => {
@@ -112,7 +125,7 @@ export default function RewardScreen() {
               />
             ))}
           </View>
-          <Field label="Other amount" placeholder="e.g. 75p or £1.25" value={amountText} onChangeText={setAmountText} keyboardType="decimal-pad" />
+          <Field label="Other amount" placeholder={cur.example} value={amountText} onChangeText={setAmountText} keyboardType="decimal-pad" />
           {amountText.length > 0 && typed == null && <Text variant="small" style={{ color: colors.danger }}>That amount does not look right.</Text>}
         </View>
 
@@ -122,7 +135,7 @@ export default function RewardScreen() {
           <View style={styles.preview}>
             <Avatar name={child.name} colour={child.colour} photo={child.photo} size={40} />
             <Text style={{ flex: 1 }}>
-              {`${formatPence(amount)} into ${child.name}'s jar`}
+              {`${formatMoney(amount)} into ${child.name}'s jar${day === today ? '' : `, for ${dayLabel(day)}`}`}
             </Text>
           </View>
         )}
@@ -137,5 +150,6 @@ const styles = StyleSheet.create({
   page: { padding: 16, gap: 22, paddingBottom: 48 },
   section: { gap: 10 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  row: { flexDirection: 'row', gap: 8 },
   preview: { flexDirection: 'row', alignItems: 'center', gap: 12, backgroundColor: colors.limeSoft, borderRadius: 18, padding: 12 },
 });

@@ -4,7 +4,7 @@ import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { Avatar, Button, Card, PoweredBy, Text } from '@/components/ui';
 import { listActivities, listChildren, type Activity } from '@/lib/db';
 import { useQuery } from '@/lib/data';
-import { formatPence } from '@/lib/money';
+import { formatMoney } from '@/lib/money';
 import { colors } from '@/lib/theme';
 
 export default function Manage() {
@@ -52,7 +52,7 @@ function Section({ title, tint, items }: { title: string; tint: string; items: A
           style={styles.row}>
           <View style={[styles.dot, { backgroundColor: tint }]} />
           <Text style={{ flex: 1 }}>{a.title}</Text>
-          <Text variant="label">{formatPence(a.default_pence)}</Text>
+          <Text variant="label">{formatMoney(a.default_pence)}</Text>
         </Pressable>
       ))}
     </Card>

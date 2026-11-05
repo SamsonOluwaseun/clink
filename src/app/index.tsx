@@ -1,18 +1,19 @@
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CoinLogo, Jar } from '@/components/jar';
 import { Avatar, Button, Card, PoweredBy, ProgressBar, Text } from '@/components/ui';
-import { listChildren, type ChildSummary } from '@/lib/db';
-import { useQuery } from '@/lib/data';
-import { formatPence } from '@/lib/money';
+import { duplicateGroups, listChildren, mergeChildren, type ChildSummary } from '@/lib/db';
+import { useDb, useQuery, useRefresh } from '@/lib/data';
+import { formatMoney, money } from '@/lib/money';
 import { useSync } from '@/lib/sync';
 import { colors, fonts } from '@/lib/theme';
 
 export default function Home() {
   const children = useQuery(listChildren);
   const sync = useSync();
+  const dupes = children ? duplicateGroups(children) : [];
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.cream }} edges={['top']}>
@@ -23,12 +24,14 @@ export default function Home() {
             <CoinLogo size={24} />
           </View>
           <View style={styles.headerButtons}>
-            <Pressable accessibilityRole="button" onPress={() => router.push('/sync')} style={styles.pill}>
-              <View style={[styles.syncDot, { backgroundColor: sync.paired ? (sync.status === 'nobody' || sync.status === 'no-wifi' ? colors.muted : colors.limeDeep) : colors.line }]} />
-              <Text variant="label" style={{ color: colors.blueDark }}>Sync</Text>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/report')} style={styles.pill}>
+              <Text variant="label" style={{ color: colors.blueDark }}>Report</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" onPress={() => router.push('/manage')} style={styles.pill}>
-              <Text variant="label" style={{ color: colors.blueDark }}>Activities</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="Settings" onPress={() => router.push('/settings')} style={styles.pill}>
+              {sync.paired && (
+                <View style={[styles.syncDot, { backgroundColor: sync.status === 'nobody' || sync.status === 'no-wifi' ? colors.muted : colors.limeDeep }]} />
+              )}
+              <Text variant="label" style={{ color: colors.blueDark }}>Settings</Text>
             </Pressable>
           </View>
         </View>
@@ -41,11 +44,20 @@ export default function Home() {
 
         {children && children.length === 0 && <EmptyState />}
 
-        {children?.map((c) => <ChildCard key={c.id} child={c} />)}
-
         {children && children.length > 0 && (
-          <Button kind="ghost" label="Add another child" onPress={() => router.push('/child-form')} />
+          <View style={styles.sectionHead}>
+            <Text variant="heading" style={{ flex: 1 }}>
+              Your children · {children.length}
+            </Text>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/child-form')} style={styles.addPill}>
+              <Text variant="label" style={{ color: colors.cream }}>+ Add child</Text>
+            </Pressable>
+          </View>
         )}
+
+        {dupes.map((g) => <DuplicateBanner key={g[0].id} group={g} />)}
+
+        {children?.map((c) => <ChildCard key={c.id} child={c} />)}
 
         <PoweredBy />
       </ScrollView>
@@ -57,51 +69,81 @@ function ChildCard({ child }: { child: ChildSummary }) {
   const target = child.goal?.target_pence ?? 0;
   const progress = target > 0 ? child.balance / target : 0;
   const left = Math.max(0, target - child.balance);
+  const open = () => router.push({ pathname: '/child/[id]', params: { id: child.id } });
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${child.name}, ${formatPence(child.balance)} saved`}
-      onPress={() => router.push({ pathname: '/child/[id]', params: { id: child.id } })}>
-      <Card>
-        <View style={styles.row}>
-          <Avatar name={child.name} colour={child.colour} photo={child.photo} size={56} />
-          <View style={{ flex: 1 }}>
-            <Text variant="heading">{child.name}</Text>
-            <Text variant="small">{child.goal ? `Saving for ${child.goal.title}` : 'No goal set yet'}</Text>
-          </View>
-          <Text style={styles.balance}>{formatPence(child.balance)}</Text>
+    <Card>
+      <Pressable accessibilityRole="button" accessibilityLabel={`${child.name}, ${formatMoney(child.balance)} saved`} onPress={open} style={styles.row}>
+        <Avatar name={child.name} colour={child.colour} photo={child.photo} size={56} />
+        <View style={{ flex: 1 }}>
+          <Text variant="heading">{child.name}</Text>
+          <Text variant="small">{child.goal ? `Saving for ${child.goal.title}` : 'No goal set yet'}</Text>
         </View>
-        {child.goal && (
-          <View style={{ gap: 6 }}>
-            <ProgressBar value={progress} />
-            <Text variant="small">
-              {left === 0 ? 'Goal reached! Time to buy it.' : `${formatPence(left)} to go of ${formatPence(target)}`}
-            </Text>
-          </View>
+        <Text style={styles.balance}>{formatMoney(child.balance)}</Text>
+      </Pressable>
+      {child.goal && (
+        <Pressable accessibilityRole="button" onPress={open} style={{ gap: 6 }}>
+          <ProgressBar value={progress} />
+          <Text variant="small">
+            {left === 0 ? 'Goal reached! Time to buy it.' : `${formatMoney(left)} to go of ${formatMoney(target)}`}
+          </Text>
+        </Pressable>
+      )}
+      <Button kind="lime" label="Give a reward" onPress={() => router.push({ pathname: '/reward', params: { childId: child.id } })} />
+      <View style={styles.actions}>
+        {child.goal ? (
+          <Small label="Goals" onPress={open} />
+        ) : (
+          <Small label="Set a goal" onPress={() => router.push({ pathname: '/goal', params: { childId: child.id } })} />
         )}
-        <View style={styles.actions}>
-          {!child.goal && (
-            <Button
-              kind="ghost"
-              label="Set a goal"
-              style={{ flex: 1 }}
-              onPress={() => router.push({ pathname: '/goal', params: { childId: child.id } })}
-            />
-          )}
-          <Button
-            kind="lime"
-            label="Give a reward"
-            style={{ flex: 1 }}
-            onPress={() => router.push({ pathname: '/reward', params: { childId: child.id } })}
-          />
-        </View>
-      </Card>
+        <Small label="Tithe or offering" onPress={() => router.push({ pathname: '/give', params: { childId: child.id } })} />
+        <Small label="Edit" onPress={() => router.push({ pathname: '/child-form', params: { id: child.id } })} />
+      </View>
+    </Card>
+  );
+}
+
+function Small({ label, onPress }: { label: string; onPress: () => void }) {
+  return (
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.small}>
+      <Text variant="label" style={{ color: colors.blueDark, textAlign: 'center' }}>{label}</Text>
     </Pressable>
   );
 }
 
+function DuplicateBanner({ group }: { group: ChildSummary[] }) {
+  const db = useDb();
+  const refresh = useRefresh();
+  const [keep, ...rest] = [...group].sort((a, b) => b.balance - a.balance || a.created_at.localeCompare(b.created_at));
+
+  const combine = () => {
+    Alert.alert(
+      `Combine ${keep.name}?`,
+      `${keep.name} appears ${group.length} times. Clink will keep one, move every reward and goal into it, and remove the rest. Total saved: ${formatMoney(group.reduce((s, c) => s + c.balance, 0))}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Combine',
+          onPress: async () => {
+            for (const d of rest) await mergeChildren(db, keep.id, d.id);
+            refresh();
+          },
+        },
+      ],
+    );
+  };
+
+  return (
+    <Card style={{ backgroundColor: colors.limeSoft }}>
+      <Text style={{ fontFamily: fonts.semibold }}>{keep.name} is here {group.length} times</Text>
+      <Text variant="small">Probably added twice. Combine them into one, keeping all rewards and goals.</Text>
+      <Button label={`Combine into one ${keep.name}`} onPress={combine} />
+    </Card>
+  );
+}
+
 function EmptyState() {
+  const cur = money();
   return (
     <Card style={{ alignItems: 'center', paddingVertical: 28 }}>
       <Jar progress={0.35} size={150} />
@@ -111,6 +153,11 @@ function EmptyState() {
       </Text>
       <Button label="Add your first child" onPress={() => router.push('/child-form')} style={{ alignSelf: 'stretch' }} />
       <Button kind="ghost" label="Join another parent's phone" onPress={() => router.push('/sync')} style={{ alignSelf: 'stretch' }} />
+      <Pressable accessibilityRole="button" onPress={() => router.push('/settings')}>
+        <Text variant="small" style={{ textAlign: 'center' }}>
+          Currency: {cur.symbol} {cur.name} · <Text variant="small" style={{ color: colors.blueDark, fontFamily: fonts.semibold }}>Change</Text>
+        </Text>
+      </Pressable>
     </Card>
   );
 }
@@ -123,7 +170,10 @@ const styles = StyleSheet.create({
   headerButtons: { flexDirection: 'row', gap: 8 },
   pill: { minHeight: 44, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 22, backgroundColor: colors.blueSoft },
   syncDot: { width: 9, height: 9, borderRadius: 5 },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  addPill: { minHeight: 44, paddingHorizontal: 16, justifyContent: 'center', borderRadius: 22, backgroundColor: colors.navy },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  actions: { flexDirection: 'row', gap: 10 },
+  actions: { flexDirection: 'row', gap: 8 },
+  small: { flex: 1, minHeight: 44, paddingHorizontal: 6, borderRadius: 14, borderWidth: 2, borderColor: colors.blueSoft, alignItems: 'center', justifyContent: 'center' },
   balance: { fontFamily: fonts.bold, fontSize: 24, color: colors.navy },
 });

@@ -4,6 +4,8 @@ import * as db from '../src/lib/db';
 import { familyIdFor, newFamilyKey, open, seal } from '../src/lib/sync/crypto';
 import { exchange, findPeers, listPeers, startServer } from '../src/lib/sync/net';
 import { FakeDb } from './shims/sqlite';
+import { addDays, localDay, weekStart } from '../src/lib/dates';
+import { currencies, formatMoney, parseMoney, tithe } from '../src/lib/money';
 
 const g = globalThis as any;
 let passed = 0;
@@ -157,6 +159,76 @@ async function main() {
   const found = await findPeers(B);
   assert.deepEqual(found, ['127.0.0.1']);
   ok('network scan finds the paired phone');
+
+  console.log('Version 0.3: dates, giving, currency, duplicates');
+  const today = localDay();
+  const yesterday = addDays(today, -1);
+  const D = new FakeDb() as any;
+  await db.migrate(D);
+  const ada = await db.addChild(D, 'Ada', '#4392F1', null);
+  assert.equal(await db.addChild(D, '  ada ', '#00212B', null), ada);
+  ok('adding the same name twice returns the first child, no duplicate');
+  await db.giveReward(D, { childId: ada, activity: null, title: 'Tidied', environment: 'home', pence: 100, forDate: yesterday });
+  await db.giveReward(D, { childId: ada, activity: null, title: 'Reading', environment: 'school', pence: 200 });
+  const hist = await db.listEntries(D, ada);
+  assert.equal(hist[0].day, today);
+  assert.equal(hist[1].day, yesterday);
+  ok('rewards keep the day they were for, newest day first');
+  const wk = await db.earnedBetween(D, ada, weekStart(), today);
+  const expected = yesterday >= weekStart() ? 300 : 200;
+  assert.equal(wk.home + wk.school, expected);
+  ok('this week counts rewards by the day they were for');
+  await db.recordGift(D, { childId: ada, kind: 'tithe', pence: tithe(300) });
+  await db.recordGift(D, { childId: ada, kind: 'offering', pence: 50 });
+  assert.equal(tithe(300), 30);
+  assert.equal(await db.balance(D, ada), 300 - 30 - 50);
+  assert.deepEqual(await db.givingTotals(D, ada), { tithe: 30, offering: 50 });
+  ok('tithe is a tenth, gifts come out of savings and are totalled');
+  const rep = await db.weekReport(D, weekStart(), addDays(weekStart(), 6));
+  assert.equal(rep[0].given, 80);
+  assert.equal(rep[0].byDay[today], 200);
+  ok('weekly report has per-day earnings and gifts');
+
+  // Duplicate made before pairing, then combined
+  const E = new FakeDb() as any;
+  await db.migrate(E);
+  await E.runAsync("INSERT INTO children (id, name, colour, photo, created_at, updated_at, device_id, rev) VALUES ('dupe', 'Ada', '#000000', 'cGg=', ?, ?, 'x', 999)", today, today);
+  await db.giveReward(E, { childId: 'dupe', activity: null, title: 'Helped', environment: 'home', pence: 70 });
+  assert.equal(db.duplicateGroups([...(await db.listChildren(E)), ...(await db.listChildren(D))]).length, 1);
+  await E.runAsync("INSERT INTO children (id, name, colour, created_at, updated_at, device_id, rev) VALUES ('keep', 'Ada', '#111111', ?, ?, 'x', 1000)", today, today);
+  await db.mergeChildren(E, 'keep', 'dupe');
+  assert.equal(await db.balance(E, 'keep'), 70);
+  assert.equal((await db.listChildren(E)).length, 1);
+  assert.equal((await db.getChild(E, 'keep'))?.photo, 'cGg=');
+  ok('combining duplicates keeps rewards and photo, leaves one child');
+
+  // Currency
+  await db.setCurrency(D, 'GBP', true);
+  assert.equal((await db.getActivity(D, 'starter-tidied-bedroom'))?.default_pence, 50);
+  await db.setCurrency(D, 'NGN');
+  assert.equal(await db.getCurrency(D), 'NGN');
+  assert.equal((await db.getActivity(D, 'starter-tidied-bedroom'))?.default_pence, 10000);
+  ok('switching to naira moves starter amounts (50p becomes ₦100)');
+  assert.equal(formatMoney(150000, currencies.NGN), '₦1,500');
+  assert.equal(formatMoney(50, currencies.GBP), '50p');
+  assert.equal(formatMoney(125, currencies.USD), '$1.25');
+  assert.equal(formatMoney(25, currencies.CAD), '25¢');
+  assert.equal(parseMoney('₦1,500'), 150000);
+  assert.equal(parseMoney('75p'), 75);
+  assert.equal(parseMoney('$1.25'), 125);
+  assert.equal(tithe(155000, currencies.NGN), 16000);
+  ok('amounts format and parse in all four currencies');
+
+  // Currency and dates travel to the paired phone
+  await db.setSetting(D, 'family_key', key);
+  g.__MY_IP = '127.0.0.2';
+  await exchange(D, '127.0.0.1');
+  await new Promise((r) => setTimeout(r, 500));
+  assert.equal(await db.getCurrency(A), 'NGN');
+  const adaOnA = await db.listEntries(A, ada);
+  assert.equal(adaOnA.find((e) => e.title === 'Tidied')?.day, yesterday);
+  assert.deepEqual(await db.givingTotals(A, ada), { tithe: 30, offering: 50 });
+  ok('currency, reward dates and gifts sync to the other phone');
 
   stopA();
   console.log(`\nAll ${passed} checks passed`);

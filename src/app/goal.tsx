@@ -5,11 +5,10 @@ import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } f
 import { Button, Chip, Field, Text } from '@/components/ui';
 import { addGoal, deleteGoal, getChild, getGoal, updateGoal } from '@/lib/db';
 import { useDb, useRefresh } from '@/lib/data';
-import { formatPence, parseToPence } from '@/lib/money';
+import { formatMoney, money, parseMoney, toMajorText } from '@/lib/money';
 import { colors } from '@/lib/theme';
 
 const ideas = ['Toy car', 'Toy plane', 'Lego set', 'Football', 'Day out', 'New book'];
-const targets = [500, 1000, 1500, 2000, 3000];
 
 // Add a goal (childId), or edit one (goalId)
 export default function GoalScreen() {
@@ -29,7 +28,7 @@ export default function GoalScreen() {
         if (g) {
           cid = g.child_id;
           setTitle(g.title);
-          setAmount((g.target_pence / 100).toFixed(2).replace(/\.00$/, ''));
+          setAmount(toMajorText(g.target_pence));
         }
       }
       setOwner(cid);
@@ -37,7 +36,8 @@ export default function GoalScreen() {
     })();
   }, [db, childId, goalId]);
 
-  const pence = parseToPence(amount);
+  const cur = money();
+  const pence = parseMoney(amount);
   const ready = !!owner && title.trim().length > 0 && pence != null && pence > 0;
 
   const save = async () => {
@@ -81,11 +81,11 @@ export default function GoalScreen() {
           <View style={{ gap: 10 }}>
             <Text variant="label">How much does it cost?</Text>
             <View style={styles.wrap}>
-              {targets.map((t) => (
-                <Chip key={t} label={formatPence(t)} tint={colors.navy} selected={pence === t} onPress={() => setAmount(String(t / 100))} />
+              {cur.targets.map((t) => (
+                <Chip key={t} label={formatMoney(t)} tint={colors.navy} selected={pence === t} onPress={() => setAmount(toMajorText(t))} />
               ))}
             </View>
-            <Field label="Exact price in pounds" placeholder="e.g. 12.99" value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
+            <Field label={`Exact price (${cur.symbol})`} placeholder={cur.priceExample} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
           </View>
 
           <Button label={goalId ? 'Save changes' : 'Save goal'} disabled={!ready} onPress={save} />

@@ -1,9 +1,9 @@
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Avatar, Button, Field, Text } from '@/components/ui';
-import { addChild, getChild, removeChild, updateChild } from '@/lib/db';
+import { addChild, findChildByName, getChild, removeChild, updateChild } from '@/lib/db';
 import { useDb, useRefresh } from '@/lib/data';
 import { pickChildPhoto } from '@/lib/photos';
 import { avatarColours, colors } from '@/lib/theme';
@@ -16,6 +16,7 @@ export default function ChildForm() {
   const [colour, setColour] = useState(avatarColours[0]);
   const [photo, setPhoto] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const saving = useRef(false); // stops a quick double tap adding the child twice
 
   useEffect(() => {
     if (!id) return;
@@ -39,17 +40,32 @@ export default function ChildForm() {
   };
 
   const save = async () => {
-    if (!name.trim()) return;
-    if (id) {
-      await updateChild(db, id, name, colour, photo);
+    if (!name.trim() || saving.current) return;
+    saving.current = true;
+    setBusy(true);
+    try {
+      const same = await findChildByName(db, name, id);
+      if (same) {
+        Alert.alert(`You already have ${same.name}`, 'Each child can only be added once. Open their card to reward them or change their details.', [
+          { text: 'OK', style: 'cancel' },
+          { text: `Open ${same.name}`, onPress: () => router.replace({ pathname: '/child/[id]', params: { id: same.id } }) },
+        ]);
+        return;
+      }
+      if (id) {
+        await updateChild(db, id, name, colour, photo);
+        refresh();
+        router.back();
+        return;
+      }
+      const newId = await addChild(db, name, colour, photo);
       refresh();
-      router.back();
-      return;
+      // Straight on to their first goal
+      router.replace({ pathname: '/goal', params: { childId: newId, first: '1' } });
+    } finally {
+      saving.current = false;
+      setBusy(false);
     }
-    const newId = await addChild(db, name, colour, photo);
-    refresh();
-    // Straight on to their first goal
-    router.replace({ pathname: '/goal', params: { childId: newId, first: '1' } });
   };
 
   const remove = () => {
@@ -95,7 +111,7 @@ export default function ChildForm() {
           ))}
         </View>
       </View>
-      <Button label={id ? 'Save' : 'Next: set a goal'} disabled={!name.trim()} onPress={save} />
+      <Button label={id ? 'Save' : 'Next: set a goal'} disabled={!name.trim() || busy} onPress={save} />
       {id && <Button kind="danger" label="Remove child" onPress={remove} />}
     </ScrollView>
   );

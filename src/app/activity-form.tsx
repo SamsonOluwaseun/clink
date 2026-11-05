@@ -5,7 +5,7 @@ import { ScrollView, StyleSheet, View } from 'react-native';
 import { Button, Chip, Field, Text } from '@/components/ui';
 import { archiveActivity, getActivity, saveActivity, type Environment } from '@/lib/db';
 import { useDb, useRefresh } from '@/lib/data';
-import { formatPence, parseToPence, quickAmounts } from '@/lib/money';
+import { formatMoney, money, parseMoney } from '@/lib/money';
 import { colors } from '@/lib/theme';
 
 export default function ActivityForm() {
@@ -14,7 +14,8 @@ export default function ActivityForm() {
   const refresh = useRefresh();
   const [title, setTitle] = useState('');
   const [env, setEnv] = useState<Environment>('home');
-  const [amount, setAmount] = useState('50p');
+  const cur = money();
+  const [amount, setAmount] = useState(formatMoney(cur.quick[2]));
 
   useEffect(() => {
     if (!id) return;
@@ -22,11 +23,11 @@ export default function ActivityForm() {
       if (!a) return;
       setTitle(a.title);
       setEnv(a.environment);
-      setAmount(formatPence(a.default_pence));
+      setAmount(formatMoney(a.default_pence));
     });
   }, [db, id]);
 
-  const pence = parseToPence(amount);
+  const pence = parseMoney(amount);
   const ready = title.trim().length > 0 && pence != null && pence > 0;
 
   const save = async () => {
@@ -56,11 +57,11 @@ export default function ActivityForm() {
       <View style={{ gap: 10 }}>
         <Text variant="label">Usual reward</Text>
         <View style={styles.wrap}>
-          {quickAmounts.map((p) => (
-            <Chip key={p} label={formatPence(p)} tint={colors.navy} selected={pence === p} onPress={() => setAmount(formatPence(p))} />
+          {cur.quick.map((p) => (
+            <Chip key={p} label={formatMoney(p)} tint={colors.navy} selected={pence === p} onPress={() => setAmount(formatMoney(p))} />
           ))}
         </View>
-        <Field label="Other amount" value={amount} onChangeText={setAmount} keyboardType="default" />
+        <Field label="Other amount" placeholder={cur.example} value={amount} onChangeText={setAmount} keyboardType="default" />
         <Text variant="small">You can always change the amount when you give the reward.</Text>
       </View>
       <Button label="Save activity" disabled={!ready} onPress={save} />

@@ -9,6 +9,7 @@ import { nextRev } from '../db';
  * - children, goals and activities can change: the newer edit wins, compared by
  *   updated_at and then device_id so both phones always pick the same winner.
  * - goals.evidence_uri points at a photo file on one phone only, so it never travels.
+ * - prefs holds family-wide settings such as the currency, newest edit wins.
  */
 
 type Row = Record<string, string | number | null>;
@@ -17,6 +18,7 @@ export interface ChangeSet {
   children: Row[];
   goals: Row[];
   activities: Row[];
+  prefs: Row[];
   entries: Row[];
   maxRev: number; // highest rev included, so the other phone can acknowledge it
 }
@@ -25,14 +27,15 @@ const COLUMNS = {
   children: ['id', 'name', 'colour', 'photo', 'created_at', 'updated_at', 'device_id', 'deleted'],
   goals: ['id', 'child_id', 'title', 'target_pence', 'status', 'created_at', 'bought_at', 'updated_at', 'device_id', 'deleted', 'evidence'],
   activities: ['id', 'title', 'environment', 'default_pence', 'archived', 'created_at', 'updated_at', 'device_id'],
-  entries: ['id', 'child_id', 'type', 'amount_pence', 'activity_id', 'goal_id', 'ref_id', 'title', 'environment', 'note', 'created_at', 'device_id'],
+  prefs: ['id', 'value', 'updated_at', 'device_id'],
+  entries: ['id', 'child_id', 'type', 'amount_pence', 'activity_id', 'goal_id', 'ref_id', 'title', 'environment', 'note', 'for_date', 'created_at', 'device_id'],
 } as const;
 
 type Table = keyof typeof COLUMNS;
-const TABLES: Table[] = ['children', 'goals', 'activities', 'entries'];
+const TABLES: Table[] = ['children', 'goals', 'activities', 'prefs', 'entries'];
 
 export async function collectChanges(db: SQLiteDatabase, sinceRev: number): Promise<ChangeSet> {
-  const out: ChangeSet = { children: [], goals: [], activities: [], entries: [], maxRev: sinceRev };
+  const out: ChangeSet = { children: [], goals: [], activities: [], prefs: [], entries: [], maxRev: sinceRev };
   for (const table of TABLES) {
     const rows = await db.getAllAsync<Row>(
       `SELECT ${COLUMNS[table].join(', ')}, rev FROM ${table} WHERE rev > ? ORDER BY rev`,
@@ -48,7 +51,8 @@ export async function collectChanges(db: SQLiteDatabase, sinceRev: number): Prom
 }
 
 // Returns how many rows changed on this phone
-export async function applyChanges(db: SQLiteDatabase, set: Omit<ChangeSet, 'maxRev'>): Promise<number> {
+// Phones on 0.2 send no prefs and no for_date: both are optional here
+export async function applyChanges(db: SQLiteDatabase, set: Partial<Omit<ChangeSet, 'maxRev'>>): Promise<number> {
   let changed = 0;
   await db.withTransactionAsync(async () => {
     // Entries: keep anything new
@@ -62,7 +66,7 @@ export async function applyChanges(db: SQLiteDatabase, set: Omit<ChangeSet, 'max
     }
 
     // Editable tables: newer edit wins
-    for (const table of ['children', 'goals', 'activities'] as const) {
+    for (const table of ['children', 'goals', 'activities', 'prefs'] as const) {
       const cols = COLUMNS[table];
       for (const r of set[table] ?? []) {
         const mine = await db.getFirstAsync<{ updated_at: string; device_id: string }>(

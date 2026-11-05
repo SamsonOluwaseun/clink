@@ -8,7 +8,8 @@ import { Avatar, Button, Card, PoweredBy, Text } from '@/components/ui';
 import {
   activeGoals,
   boughtGoals,
-  earnedSince,
+  earnedBetween,
+  givingTotals,
   getChild,
   listEntries,
   makeCurrentGoal,
@@ -19,17 +20,10 @@ import {
   type Goal,
 } from '@/lib/db';
 import { useDb, useQuery, useRefresh } from '@/lib/data';
-import { formatPence } from '@/lib/money';
+import { dayLabel, localDay, weekStart } from '@/lib/dates';
+import { formatMoney } from '@/lib/money';
 import { photoSource, takeGoalPhoto } from '@/lib/photos';
 import { colors, fonts } from '@/lib/theme';
-
-function startOfWeek() {
-  const d = new Date();
-  const day = (d.getDay() + 6) % 7; // Monday = 0
-  d.setHours(0, 0, 0, 0);
-  d.setDate(d.getDate() - day);
-  return d.toISOString();
-}
 
 function when(iso: string) {
   const d = new Date(iso);
@@ -48,7 +42,8 @@ export default function ChildScreen() {
   const child = useQuery((d) => getChild(d, id), [id]);
   const goals = useQuery((d) => activeGoals(d, id), [id]);
   const entries = useQuery((d) => listEntries(d, id), [id]);
-  const week = useQuery((d) => earnedSince(d, id, startOfWeek()), [id]);
+  const week = useQuery((d) => earnedBetween(d, id, weekStart(), localDay()), [id]);
+  const giving = useQuery((d) => givingTotals(d, id), [id]);
   const bought = useQuery((d) => boughtGoals(d, id), [id]);
 
   if (!child) return null;
@@ -73,7 +68,7 @@ export default function ChildScreen() {
     if (!goal) return;
     Alert.alert(
       `Bought the ${goal.title}?`,
-      `${formatPence(target)} comes out of ${child.name}'s jar. Anything extra stays for the next goal.\n\nTake a photo to remember the moment? It is saved to your phone.`,
+      `${formatMoney(target)} comes out of ${child.name}'s jar. Anything extra stays for the next goal.\n\nTake a photo to remember the moment? It is saved to your phone.`,
       [
         { text: 'Not yet', style: 'cancel' },
         { text: 'Yes, no photo', onPress: () => buy(false) },
@@ -91,7 +86,7 @@ export default function ChildScreen() {
   };
 
   const goalOptions = (g: Goal) => {
-    Alert.alert(g.title, `${formatPence(g.target_pence)}`, [
+    Alert.alert(g.title, `${formatMoney(g.target_pence)}`, [
       { text: 'Save for this one first', onPress: async () => { await makeCurrentGoal(db, g); refresh(); } },
       { text: 'Edit or delete', onPress: () => editGoal(g) },
       { text: 'Cancel', style: 'cancel' },
@@ -99,7 +94,13 @@ export default function ChildScreen() {
   };
 
   const confirmUndo = (e: Entry) => {
-    Alert.alert('Undo this reward?', `${e.title} (${formatPence(e.amount_pence)}) will be taken out of the jar.`, [
+    const gift = e.type === 'give';
+    Alert.alert(
+      gift ? `Undo this ${e.title.toLowerCase()}?` : 'Undo this reward?',
+      gift
+        ? `${formatMoney(Math.abs(e.amount_pence))} goes back into the jar.`
+        : `${e.title} (${formatMoney(e.amount_pence)}) will be taken out of the jar.`,
+      [
       { text: 'Keep it', style: 'cancel' },
       {
         text: 'Undo',
@@ -109,7 +110,8 @@ export default function ChildScreen() {
           refresh();
         },
       },
-    ]);
+      ],
+    );
   };
 
   return (
@@ -133,12 +135,12 @@ export default function ChildScreen() {
             <Avatar name={child.name} colour={child.colour} photo={child.photo} size={64} />
             <Jar progress={goal ? progress : 0} size={150} />
           </View>
-          <Text style={styles.balance}>{formatPence(child.balance)}</Text>
+          <Text style={styles.balance}>{formatMoney(child.balance)}</Text>
           {goal ? (
             <Pressable accessibilityRole="button" accessibilityHint="Edit this goal" onPress={() => editGoal(goal)} style={{ alignItems: 'center' }}>
               <Text variant="heading" style={{ textAlign: 'center' }}>Saving for {goal.title}</Text>
               <Text variant="small">
-                {reached ? 'Goal reached!' : `${formatPence(target - child.balance)} to go of ${formatPence(target)}`}
+                {reached ? 'Goal reached!' : `${formatMoney(target - child.balance)} to go of ${formatMoney(target)}`}
                 {'  ·  '}
                 <Text variant="small" style={{ color: colors.blueDark, fontFamily: fonts.semibold }}>Edit</Text>
               </Text>
@@ -152,6 +154,12 @@ export default function ChildScreen() {
             label="Give a reward"
             style={{ alignSelf: 'stretch', marginTop: 8 }}
             onPress={() => router.push({ pathname: '/reward', params: { childId: child.id } })}
+          />
+          <Button
+            kind="ghost"
+            label="Give a tithe or offering"
+            style={{ alignSelf: 'stretch' }}
+            onPress={() => router.push({ pathname: '/give', params: { childId: child.id } })}
           />
           {reached && <Button label="We bought it" style={{ alignSelf: 'stretch' }} onPress={confirmBought} />}
           {!goal && <Button kind="ghost" label="Set a goal" style={{ alignSelf: 'stretch' }} onPress={addGoal} />}
@@ -174,13 +182,32 @@ export default function ChildScreen() {
             <View style={styles.split}>
               <View style={[styles.pill, { backgroundColor: colors.blueSoft }]}>
                 <Text variant="label" style={{ color: colors.blueDark }}>Home</Text>
-                <Text style={styles.pillValue}>{formatPence(week.home)}</Text>
+                <Text style={styles.pillValue}>{formatMoney(week.home)}</Text>
               </View>
               <View style={[styles.pill, { backgroundColor: colors.schoolSoft }]}>
                 <Text variant="label" style={{ color: colors.school }}>School</Text>
-                <Text style={styles.pillValue}>{formatPence(week.school)}</Text>
+                <Text style={styles.pillValue}>{formatMoney(week.school)}</Text>
               </View>
             </View>
+            {week.given > 0 && <Text variant="small">Gave {formatMoney(week.given)} this week</Text>}
+            <Button kind="ghost" label="See the weekly report" onPress={() => router.push('/report')} />
+          </Card>
+        )}
+
+        {giving && giving.tithe + giving.offering > 0 && (
+          <Card>
+            <Text variant="heading">Giving</Text>
+            <View style={styles.split}>
+              <View style={[styles.pill, { backgroundColor: colors.limeSoft }]}>
+                <Text variant="label" style={{ color: colors.navy }}>Tithes</Text>
+                <Text style={styles.pillValue}>{formatMoney(giving.tithe)}</Text>
+              </View>
+              <View style={[styles.pill, { backgroundColor: colors.limeSoft }]}>
+                <Text variant="label" style={{ color: colors.navy }}>Offerings</Text>
+                <Text style={styles.pillValue}>{formatMoney(giving.offering)}</Text>
+              </View>
+            </View>
+            <Text variant="small">Given from {child.name}&rsquo;s savings so far.</Text>
           </Card>
         )}
 
@@ -199,7 +226,7 @@ export default function ChildScreen() {
                 <View style={{ flex: 1 }}>
                   <Text style={{ fontFamily: fonts.semibold }}>{g.title}</Text>
                   <Text variant="small">
-                    {formatPence(g.target_pence)}
+                    {formatMoney(g.target_pence)}
                     {g.bought_at ? ` · ${when(g.bought_at)}` : ''}
                   </Text>
                 </View>
@@ -215,25 +242,25 @@ export default function ChildScreen() {
             <Pressable
               key={e.id}
               accessibilityRole="button"
-              accessibilityHint={e.type === 'reward' && !e.undone ? 'Long press to undo' : undefined}
-              onLongPress={() => e.type === 'reward' && !e.undone && confirmUndo(e)}
+              accessibilityHint={(e.type === 'reward' || e.type === 'give') && !e.undone ? 'Long press to undo' : undefined}
+              onLongPress={() => (e.type === 'reward' || e.type === 'give') && !e.undone && confirmUndo(e)}
               style={styles.entry}>
-              <View style={[styles.dot, { backgroundColor: e.type === 'purchase' ? colors.limeDeep : e.environment === 'school' ? colors.school : colors.blue }]} />
+              <View style={[styles.dot, { backgroundColor: e.type === 'purchase' || e.type === 'give' ? colors.limeDeep : e.environment === 'school' ? colors.school : colors.blue }]} />
               <View style={{ flex: 1 }}>
                 <Text style={[{ fontSize: 15 }, e.undone ? styles.struck : null]}>{e.title}</Text>
                 <Text variant="small">
-                  {when(e.created_at)}
+                  {dayLabel(e.day)}
                   {e.note ? ` · ${e.note}` : ''}
                   {e.undone ? ' · undone' : ''}
                 </Text>
               </View>
               <Text style={[styles.amount, e.amount_pence < 0 && { color: colors.muted }, e.undone ? styles.struck : null]}>
                 {e.amount_pence > 0 ? '+' : ''}
-                {formatPence(e.amount_pence)}
+                {formatMoney(e.amount_pence)}
               </Text>
             </Pressable>
           ))}
-          {entries && entries.length > 0 && <Text variant="small" style={{ marginTop: 8 }}>Long press a reward to undo it.</Text>}
+          {entries && entries.length > 0 && <Text variant="small" style={{ marginTop: 8 }}>Long press a reward or gift to undo it.</Text>}
         </Card>
 
         <PoweredBy />
@@ -272,7 +299,7 @@ function GoalRow({ g, label, onPress }: { g: Goal; label: string; onPress: () =>
         <Text style={{ fontFamily: fonts.semibold }}>{g.title}</Text>
         <Text variant="small">{label}</Text>
       </View>
-      <Text style={styles.amount}>{formatPence(g.target_pence)}</Text>
+      <Text style={styles.amount}>{formatMoney(g.target_pence)}</Text>
       <Text variant="small" style={{ color: colors.blueDark }}>›</Text>
     </Pressable>
   );
