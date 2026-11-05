@@ -28,7 +28,7 @@ export default function ActivityForm() {
   }, [db, id]);
 
   const pence = parseMoney(amount);
-  const ready = title.trim().length > 0 && pence != null && pence > 0;
+  const ready = title.trim().length > 0 && pence != null && pence >= 0;
 
   const save = async () => {
     if (!ready || pence == null) return;
@@ -57,6 +57,7 @@ export default function ActivityForm() {
       <View style={{ gap: 10 }}>
         <Text variant="label">Usual reward</Text>
         <View style={styles.wrap}>
+          <Chip label="Praise only" tint={colors.navy} selected={pence === 0} onPress={() => setAmount('0')} />
           {cur.quick.map((p) => (
             <Chip key={p} label={formatMoney(p)} tint={colors.navy} selected={pence === p} onPress={() => setAmount(formatMoney(p))} />
           ))}

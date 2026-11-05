@@ -1,5 +1,5 @@
 import { SQLiteProvider, useSQLiteContext, type SQLiteDatabase } from 'expo-sqlite';
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { migrate } from './db';
 
@@ -7,18 +7,31 @@ import { migrate } from './db';
 // screen reading data re-runs its query when the counter moves.
 const RefreshContext = createContext<{ version: number; refresh: () => void }>({ version: 0, refresh: () => {} });
 
+/*
+ * The refresh counter sits OUTSIDE the database provider. Inside it, a change to
+ * the counter never reached the screens (the database provider does not re-render
+ * what it holds), so a screen that stayed open, like home, kept showing old data.
+ */
 export function DataProvider({ children }: { children: ReactNode }) {
   const [version, setVersion] = useState(0);
   const refresh = useCallback(() => setVersion((v) => v + 1), []);
+  const value = useMemo(() => ({ version, refresh }), [version, refresh]);
   return (
-    <SQLiteProvider databaseName="clink.db" onInit={migrate}>
-      <RefreshContext.Provider value={{ version, refresh }}>{children}</RefreshContext.Provider>
-    </SQLiteProvider>
+    <RefreshContext.Provider value={value}>
+      <SQLiteProvider databaseName="clink.db" onInit={migrate}>
+        {children}
+      </SQLiteProvider>
+    </RefreshContext.Provider>
   );
 }
 
 export function useDb() {
   return useSQLiteContext();
+}
+
+// Goes up every time data changes
+export function useVersion() {
+  return useContext(RefreshContext).version;
 }
 
 export function useRefresh() {

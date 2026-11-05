@@ -4,7 +4,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CoinLogo, Jar } from '@/components/jar';
 import { Avatar, Button, Card, PoweredBy, ProgressBar, Text } from '@/components/ui';
-import { duplicateGroups, listChildren, mergeChildren, type ChildSummary } from '@/lib/db';
+import * as Haptics from 'expo-haptics';
+
+import { duplicateGroups, favouriteActivities, giftsToPay, giveReward, listChildren, mergeChildren, setSetting, type Activity, type ChildSummary } from '@/lib/db';
+import { defaultPraise } from '@/lib/encourage';
+import { enableReminders, remindersAsked } from '@/lib/reminders';
 import { useDb, useQuery, useRefresh } from '@/lib/data';
 import { formatMoney, money } from '@/lib/money';
 import { useSync } from '@/lib/sync';
@@ -14,6 +18,9 @@ export default function Home() {
   const children = useQuery(listChildren);
   const sync = useSync();
   const dupes = children ? duplicateGroups(children) : [];
+  const gifts = useQuery(giftsToPay);
+  const asked = useQuery(remindersAsked);
+  const giftTotal = gifts?.reduce((s, g) => s + g.amount_pence, 0) ?? 0;
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.cream }} edges={['top']}>
@@ -57,7 +64,24 @@ export default function Home() {
 
         {dupes.map((g) => <DuplicateBanner key={g[0].id} group={g} />)}
 
+        {gifts && gifts.length > 0 && (
+          <Pressable accessibilityRole="button" onPress={() => router.push('/to-pay')}>
+            <Card style={{ backgroundColor: colors.limeSoft, flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontFamily: fonts.semibold }}>
+                  {gifts.length} gift{gifts.length === 1 ? '' : 's'} to pay in · {formatMoney(giftTotal)}
+                </Text>
+                <Text variant="small">Tithes and offerings the children chose to give</Text>
+              </View>
+              <Text style={styles.chev}>›</Text>
+            </Card>
+          </Pressable>
+        )}
+
+
         {children?.map((c) => <ChildCard key={c.id} child={c} />)}
+
+        {children && children.length > 0 && asked === false && <ReminderOffer />}
 
         <PoweredBy />
       </ScrollView>
@@ -90,14 +114,67 @@ function ChildCard({ child }: { child: ChildSummary }) {
         </Pressable>
       )}
       <Button kind="lime" label="Give a reward" onPress={() => router.push({ pathname: '/reward', params: { childId: child.id } })} />
+      <Favourites child={child} />
       <View style={styles.actions}>
         {child.goal ? (
           <Small label="Goals" onPress={open} />
         ) : (
           <Small label="Set a goal" onPress={() => router.push({ pathname: '/goal', params: { childId: child.id } })} />
         )}
+        <Small label="Show me" onPress={() => router.push({ pathname: '/show/[id]', params: { id: child.id } })} />
+      </View>
+      <View style={styles.actions}>
         <Small label="Tithe or offering" onPress={() => router.push({ pathname: '/give', params: { childId: child.id } })} />
         <Small label="Edit" onPress={() => router.push({ pathname: '/child-form', params: { id: child.id } })} />
+      </View>
+    </Card>
+  );
+}
+
+// The child's three most-used rewards, one tap each
+function Favourites({ child }: { child: ChildSummary }) {
+  const db = useDb();
+  const refresh = useRefresh();
+  const favs = useQuery((d) => favouriteActivities(d, child.id), [child.id]);
+  if (!favs || favs.length === 0) return null;
+
+  const give = async (a: Activity) => {
+    const praise = defaultPraise(a.title);
+    await giveReward(db, { childId: child.id, activity: a, title: a.title, environment: a.environment, pence: a.default_pence, note: praise });
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
+    refresh();
+    router.push({ pathname: '/celebrate', params: { childId: child.id, amount: String(a.default_pence), praise, before: String(child.balance) } });
+  };
+
+  return (
+    <View style={{ gap: 6 }}>
+      <Text variant="small">One tap</Text>
+      <View style={styles.favs}>
+        {favs.map((a) => (
+          <Pressable key={a.id} accessibilityRole="button" accessibilityLabel={`Reward ${a.title}`} onPress={() => give(a)} style={styles.fav}>
+            <Text style={styles.favText} numberOfLines={1}>
+              {a.title}
+            </Text>
+            <Text style={styles.favAmount}>{a.default_pence ? formatMoney(a.default_pence) : 'Praise'}</Text>
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function ReminderOffer() {
+  const db = useDb();
+  const refresh = useRefresh();
+  return (
+    <Card>
+      <Text style={{ fontFamily: fonts.semibold }}>Weekly reminders?</Text>
+      <Text variant="small">
+        A Sunday evening summary of what each child earned, a Saturday reminder of gifts to pay in, and a gentle nudge when a child has not been rewarded for a few days.
+      </Text>
+      <View style={styles.actions}>
+        <Button label="Turn on" style={{ flex: 1 }} onPress={async () => { await enableReminders(db); refresh(); }} />
+        <Button kind="ghost" label="Not now" style={{ flex: 1 }} onPress={async () => { await setSetting(db, 'reminders', 'off'); refresh(); }} />
       </View>
     </Card>
   );
@@ -176,4 +253,9 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 8 },
   small: { flex: 1, minHeight: 44, paddingHorizontal: 6, borderRadius: 14, borderWidth: 2, borderColor: colors.blueSoft, alignItems: 'center', justifyContent: 'center' },
   balance: { fontFamily: fonts.bold, fontSize: 24, color: colors.navy },
+  chev: { fontFamily: fonts.bold, fontSize: 22, color: colors.blueDark },
+  favs: { flexDirection: 'row', gap: 8 },
+  fav: { flex: 1, minHeight: 56, borderRadius: 14, backgroundColor: colors.blueSoft, paddingHorizontal: 8, paddingVertical: 6, justifyContent: 'center' },
+  favText: { fontFamily: fonts.semibold, fontSize: 13, color: colors.navy },
+  favAmount: { fontFamily: fonts.bold, fontSize: 13, color: colors.blueDark },
 });

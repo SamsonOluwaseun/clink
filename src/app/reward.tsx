@@ -7,6 +7,7 @@ import { Avatar, Button, Chip, Field, Text } from '@/components/ui';
 import { addDays, dayLabel, localDay } from '@/lib/dates';
 import { giveReward, listActivities, listChildren, type Activity, type Environment } from '@/lib/db';
 import { useDb, useQuery, useRefresh } from '@/lib/data';
+import { defaultPraise, praisePhrases } from '@/lib/encourage';
 import { formatMoney, money, parseMoney } from '@/lib/money';
 import { colors } from '@/lib/theme';
 
@@ -42,16 +43,18 @@ export default function RewardScreen() {
   const title = activity?.title ?? custom.trim();
   const typed = amountText ? parseMoney(amountText) : null;
   const amount = typed ?? pence;
-  const ready = !!childId && title.length > 0 && amount != null && amount > 0 && !saving;
+  const ready = !!childId && title.length > 0 && amount != null && (amount > 0 || (amount === 0 && !amountText)) && !saving;
   const child = children?.find((c) => c.id === childId);
 
   const give = async () => {
     if (!ready || !childId || amount == null) return;
     setSaving(true);
-    await giveReward(db, { childId, activity, title, environment: env, pence: amount, note, forDate: day });
+    const before = child?.balance ?? 0;
+    const praise = note.trim() || defaultPraise(title);
+    await giveReward(db, { childId, activity, title, environment: env, pence: amount, note: praise, forDate: day });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     refresh();
-    router.back();
+    router.replace({ pathname: '/celebrate', params: { childId, amount: String(amount), praise, before: String(before) } });
   };
 
   return (
@@ -112,10 +115,10 @@ export default function RewardScreen() {
         <View style={styles.section}>
           <Text variant="label">How much?</Text>
           <View style={styles.wrap}>
-            {cur.quick.map((p) => (
+            {[0, ...cur.quick].map((p) => (
               <Chip
                 key={p}
-                label={formatMoney(p)}
+                label={p === 0 ? 'Praise only' : formatMoney(p)}
                 selected={!amountText && pence === p}
                 tint={colors.navy}
                 onPress={() => {
@@ -129,13 +132,22 @@ export default function RewardScreen() {
           {amountText.length > 0 && typed == null && <Text variant="small" style={{ color: colors.danger }}>That amount does not look right.</Text>}
         </View>
 
-        <Field label="Note (optional)" placeholder="What made it special?" value={note} onChangeText={setNote} />
+        <View style={styles.section}>
+          <Text variant="label">Praise (shown to {child?.name ?? 'your child'})</Text>
+          <View style={styles.wrap}>
+            {praisePhrases.map((ph) => (
+              <Chip key={ph} label={ph} selected={note === ph} tint={colors.blueDark} onPress={() => setNote(note === ph ? '' : ph)} />
+            ))}
+          </View>
+          <Field label="Or in your own words" placeholder="What did they do well?" value={note} onChangeText={setNote} />
+          <Text variant="small">Praising how they tried works better than calling them clever.</Text>
+        </View>
 
-        {child && amount != null && amount > 0 && (
+        {child && amount != null && (
           <View style={styles.preview}>
             <Avatar name={child.name} colour={child.colour} photo={child.photo} size={40} />
             <Text style={{ flex: 1 }}>
-              {`${formatMoney(amount)} into ${child.name}'s jar${day === today ? '' : `, for ${dayLabel(day)}`}`}
+              {`${amount > 0 ? `${formatMoney(amount)} into ${child.name}'s jar` : `Praise for ${child.name}, no money`}${day === today ? '' : `, for ${dayLabel(day)}`}`}
             </Text>
           </View>
         )}

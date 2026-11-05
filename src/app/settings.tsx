@@ -1,11 +1,15 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useState } from 'react';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
-import { Card, PoweredBy, Text } from '@/components/ui';
-import { setCurrency } from '@/lib/db';
-import { useDb, useRefresh } from '@/lib/data';
-import { currencyList, money, type Currency } from '@/lib/money';
+import { Button, Card, Chip, PoweredBy, Text } from '@/components/ui';
+import { pickAndRestore, shareBackup } from '@/lib/backup';
+import { soundOn } from '@/lib/encourage';
+import { disableReminders, enableReminders, remindersOn } from '@/lib/reminders';
+import { getSetting, savingBonus, setCurrency, setSavingBonus, setSetting } from '@/lib/db';
+import { useDb, useQuery, useRefresh } from '@/lib/data';
+import { currencyList, formatMoney, money, type Currency } from '@/lib/money';
 import { useSync } from '@/lib/sync';
 import { colors, fonts } from '@/lib/theme';
 
@@ -14,6 +18,59 @@ export default function Settings() {
   const refresh = useRefresh();
   const sync = useSync();
   const cur = money();
+  const reminders = useQuery(remindersOn);
+  const sound = useQuery(soundOn);
+  const bonus = useQuery(savingBonus);
+  const lastBackup = useQuery((d) => getSetting(d, 'last_backup'));
+  const [working, setWorking] = useState(false);
+
+  const toggleReminders = async (on: boolean) => {
+    if (on) {
+      const ok = await enableReminders(db);
+      if (!ok) Alert.alert('Notifications are off', 'Turn on notifications for Clink in your phone settings to get reminders.');
+    } else await disableReminders(db);
+    refresh();
+  };
+
+  const chooseBonus = async (pct: number) => {
+    await setSavingBonus(db, pct);
+    refresh();
+  };
+
+  const backup = async () => {
+    setWorking(true);
+    try {
+      await shareBackup(db);
+      await setSetting(db, 'last_backup', new Date().toISOString());
+      refresh();
+    } catch (e) {
+      Alert.alert('Backup failed', e instanceof Error ? e.message : 'Please try again.');
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const restore = () => {
+    Alert.alert('Restore from a backup?', 'Clink adds everything from the backup file to this phone. Nothing here is deleted, and anything already here is not doubled.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Choose file',
+        onPress: async () => {
+          setWorking(true);
+          try {
+            const n = await pickAndRestore(db);
+            if (n == null) return;
+            refresh();
+            Alert.alert('Restored', n ? `${n} item${n === 1 ? '' : 's'} added or updated.` : 'Everything in the backup was already on this phone.');
+          } catch (e) {
+            Alert.alert('Could not restore', e instanceof Error ? e.message : 'Please try again.');
+          } finally {
+            setWorking(false);
+          }
+        },
+      },
+    ]);
+  };
 
   const choose = (c: Currency) => {
     if (c.code === cur.code) return;
@@ -59,7 +116,29 @@ export default function Settings() {
         })}
       </Card>
 
+      <Card style={{ gap: 4 }}>
+        <Text variant="heading" style={{ marginBottom: 6 }}>Encouragement</Text>
+        <Toggle label="Reminders" hint="Sunday summary, Saturday gifts to pay, a nudge after a quiet few days" value={!!reminders} onChange={toggleReminders} />
+        <Toggle
+          label="Clink sound"
+          hint="Plays when a coin drops into the jar"
+          value={sound !== false}
+          onChange={async (on) => { await setSetting(db, 'sound', on ? 'on' : 'off'); refresh(); }}
+        />
+        <View style={{ gap: 8, paddingTop: 8 }}>
+          <Text style={{ fontFamily: fonts.semibold }}>Monthly saving bonus</Text>
+          <Text variant="small">On the 1st of each month, add a little extra on whatever is still in each jar. It shows children that patience pays.</Text>
+          <View style={styles.wrap}>
+            {[0, 5, 10].map((p) => (
+              <Chip key={p} label={p === 0 ? 'Off' : `${p}%`} selected={(bonus ?? 0) === p} tint={colors.navy} onPress={() => chooseBonus(p)} />
+            ))}
+          </View>
+          {!!bonus && <Text variant="small">{`Starts next month. With ${formatMoney(cur.targets[1])} saved, a child gets ${formatMoney(Math.round((cur.targets[1] * bonus) / 100))}.`}</Text>}
+        </View>
+      </Card>
+
       <Card style={{ gap: 0 }}>
+        <Row label="Gifts to pay" hint="Tithes and offerings waiting to be paid in" onPress={() => router.push('/to-pay')} />
         <Row label="Activities" hint="Home and school activities and their usual rewards" onPress={() => router.push('/manage')} />
         <Row
           label="Family sync"
@@ -69,9 +148,37 @@ export default function Settings() {
         <Row label="Weekly report" hint="What each child earned and gave, day by day" onPress={() => router.push('/report')} />
       </Card>
 
+      <Card>
+        <Text variant="heading">Backup</Text>
+        <Text variant="small">
+          Save everything to a file you keep in Google Drive, email or Files. If a phone is lost or replaced, restore it from there.
+          {lastBackup ? ` Last backup ${new Date(lastBackup).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}.` : ' No backup yet.'}
+        </Text>
+        <Button label="Save a backup" onPress={backup} disabled={working} />
+        <Button kind="ghost" label="Restore from a backup" onPress={restore} disabled={working} />
+      </Card>
+
       <Text variant="small" style={{ textAlign: 'center' }}>Clink {Constants.expoConfig?.version ?? ''}</Text>
       <PoweredBy />
     </ScrollView>
+  );
+}
+
+function Toggle({ label, hint, value, onChange }: { label: string; hint: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <View style={styles.toggle}>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontFamily: fonts.semibold }}>{label}</Text>
+        <Text variant="small">{hint}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onChange}
+        trackColor={{ true: colors.blue, false: colors.line }}
+        thumbColor={value ? colors.navy : '#FFFFFF'}
+        accessibilityLabel={label}
+      />
+    </View>
   );
 }
 
@@ -95,4 +202,6 @@ const styles = StyleSheet.create({
   symbolText: { fontFamily: fonts.bold, fontSize: 18, color: colors.navy },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64, borderBottomWidth: 1, borderBottomColor: colors.line },
   chev: { fontFamily: fonts.bold, fontSize: 22, color: colors.blueDark },
+  toggle: { flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 64 },
+  wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });

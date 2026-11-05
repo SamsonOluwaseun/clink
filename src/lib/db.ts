@@ -22,7 +22,7 @@ import { currencies, isCurrencyCode, type CurrencyCode } from './money';
  */
 
 export type Environment = 'home' | 'school';
-export type EntryType = 'reward' | 'purchase' | 'undo' | 'give';
+export type EntryType = 'reward' | 'purchase' | 'undo' | 'give' | 'paid' | 'bonus';
 export type GiftKind = 'tithe' | 'offering';
 
 export interface Child {
@@ -31,6 +31,9 @@ export interface Child {
   colour: string;
   photo: string | null; // small JPEG as base64, synced between phones
   created_at: string;
+  pocket_pence: number | null; // weekly pocket money, 0 or null = none
+  pocket_day: number | null; // 0 = Sunday ... 6 = Saturday
+  pocket_since: string | null;
 }
 
 export interface Goal {
@@ -43,6 +46,7 @@ export interface Goal {
   bought_at: string | null;
   evidence: string | null; // small JPEG as base64, synced
   evidence_uri: string | null; // full-size photo on this phone only
+  photo: string | null; // what they are saving for, small JPEG as base64, synced
 }
 
 export interface Activity {
@@ -75,7 +79,7 @@ export interface ChildSummary extends Child {
   goal: Goal | null; // the goal savings currently go towards
 }
 
-const SCHEMA_VERSION = 3;
+const SCHEMA_VERSION = 4;
 
 export function newId() {
   return Crypto.randomUUID();
@@ -216,6 +220,16 @@ export async function migrate(db: SQLiteDatabase) {
     `);
   }
 
+  if (current < 4) {
+    // Goal photos and weekly pocket money
+    await db.execAsync(`
+      ALTER TABLE goals ADD COLUMN photo TEXT;
+      ALTER TABLE children ADD COLUMN pocket_pence INTEGER DEFAULT 0;
+      ALTER TABLE children ADD COLUMN pocket_day INTEGER DEFAULT 6;
+      ALTER TABLE children ADD COLUMN pocket_since TEXT;
+    `);
+  }
+
   await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION}`);
 }
 
@@ -253,19 +267,20 @@ const LIVE_ENTRIES = `type != 'undo' AND id NOT IN (SELECT ref_id FROM entries W
 // The day an entry counts for. Entries from before version 0.3 use the day they were made.
 const DAY = `COALESCE(for_date, date(created_at, 'localtime'))`;
 
-const GOAL_COLS = 'id, child_id, title, target_pence, status, created_at, bought_at, evidence, evidence_uri';
+const GOAL_COLS = 'id, child_id, title, target_pence, status, created_at, bought_at, evidence, evidence_uri, photo';
+const CHILD_COLS = 'id, name, colour, photo, created_at, pocket_pence, pocket_day, pocket_since';
 
 // ---------- Children ----------
 
 export async function listChildren(db: SQLiteDatabase): Promise<ChildSummary[]> {
   const children = await db.getAllAsync<Child>(
-    'SELECT id, name, colour, photo, created_at FROM children WHERE deleted = 0 ORDER BY created_at',
+    `SELECT ${CHILD_COLS} FROM children WHERE deleted = 0 ORDER BY created_at`,
   );
   return Promise.all(children.map(async (c) => ({ ...c, balance: await balance(db, c.id), goal: await activeGoal(db, c.id) })));
 }
 
 export async function getChild(db: SQLiteDatabase, id: string): Promise<ChildSummary | null> {
-  const c = await db.getFirstAsync<Child>('SELECT id, name, colour, photo, created_at FROM children WHERE id = ? AND deleted = 0', id);
+  const c = await db.getFirstAsync<Child>(`SELECT ${CHILD_COLS} FROM children WHERE id = ? AND deleted = 0`, id);
   if (!c) return null;
   return { ...c, balance: await balance(db, id), goal: await activeGoal(db, id) };
 }
@@ -308,11 +323,12 @@ export async function balance(db: SQLiteDatabase, childId: string) {
 }
 
 export async function listEntries(db: SQLiteDatabase, childId: string, limit = 100) {
-  return db.getAllAsync<Entry & { undone: number; day: string }>(
+  return db.getAllAsync<Entry & { undone: number; paid: number; day: string }>(
     `SELECT e.id, e.child_id, e.type, e.amount_pence, e.activity_id, e.goal_id, e.ref_id, e.title, e.environment, e.note, e.for_date, e.created_at, e.device_id,
        COALESCE(e.for_date, date(e.created_at, 'localtime')) AS day,
-       EXISTS(SELECT 1 FROM entries u WHERE u.type = 'undo' AND u.ref_id = e.id) AS undone
-     FROM entries e WHERE e.child_id = ? AND e.type != 'undo'
+       EXISTS(SELECT 1 FROM entries u WHERE u.type = 'undo' AND u.ref_id = e.id) AS undone,
+       EXISTS(SELECT 1 FROM entries p WHERE p.type = 'paid' AND p.ref_id = e.id) AS paid
+     FROM entries e WHERE e.child_id = ? AND e.type NOT IN ('undo', 'paid')
      ORDER BY day DESC, e.created_at DESC LIMIT ?`,
     childId, limit,
   );
@@ -322,12 +338,13 @@ async function insertEntry(
   db: SQLiteDatabase,
   e: Omit<Entry, 'id' | 'created_at' | 'device_id'>,
   createdAt?: string,
+  fixedId?: string, // same id on every phone, so a scheduled entry is only ever added once
 ) {
   const { ts, dev, rev } = await stamp(db);
-  await db.runAsync(
-    `INSERT INTO entries (id, child_id, type, amount_pence, activity_id, goal_id, ref_id, title, environment, note, for_date, created_at, device_id, rev)
+  return db.runAsync(
+    `INSERT OR IGNORE INTO entries (id, child_id, type, amount_pence, activity_id, goal_id, ref_id, title, environment, note, for_date, created_at, device_id, rev)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    newId(), e.child_id, e.type, e.amount_pence, e.activity_id, e.goal_id, e.ref_id, e.title, e.environment, e.note, e.for_date,
+    fixedId ?? newId(), e.child_id, e.type, e.amount_pence, e.activity_id, e.goal_id, e.ref_id, e.title, e.environment, e.note, e.for_date,
     createdAt ?? ts, dev, rev,
   );
 }
@@ -561,6 +578,7 @@ export interface ChildReport {
   earned: number;
   home: number;
   school: number;
+  bonus: number; // saving bonus
   given: number;
   byDay: Record<string, number>; // rewards earned per day
 }
@@ -571,7 +589,7 @@ export async function weekReport(db: SQLiteDatabase, from: string, to: string): 
     children.map(async (child) => {
       const lines = await db.getAllAsync<ReportLine>(
         `SELECT id, type, title, environment, amount_pence, note, ${DAY} AS day FROM entries
-         WHERE child_id = ? AND type IN ('reward', 'give') AND ${DAY} BETWEEN ? AND ? AND ${LIVE_ENTRIES}
+         WHERE child_id = ? AND type IN ('reward', 'give', 'bonus') AND ${DAY} BETWEEN ? AND ? AND ${LIVE_ENTRIES}
          ORDER BY day DESC, created_at DESC`,
         child.id, from, to,
       );
@@ -579,14 +597,16 @@ export async function weekReport(db: SQLiteDatabase, from: string, to: string): 
       let home = 0;
       let school = 0;
       let given = 0;
+      let bonus = 0;
       for (const l of lines) {
         if (l.type === 'reward') {
           byDay[l.day] = (byDay[l.day] ?? 0) + l.amount_pence;
           if (l.environment === 'school') school += l.amount_pence;
           else home += l.amount_pence;
-        } else given += -l.amount_pence;
+        } else if (l.type === 'bonus') bonus += l.amount_pence;
+        else given += -l.amount_pence;
       }
-      return { child, lines, earned: home + school, home, school, given, byDay };
+      return { child, lines, earned: home + school + bonus, home, school, bonus, given, byDay };
     }),
   );
 }
@@ -634,7 +654,7 @@ export async function setCurrency(db: SQLiteDatabase, code: CurrencyCode, quiet 
 
 export async function findChildByName(db: SQLiteDatabase, name: string, exceptId?: string) {
   return db.getFirstAsync<Child>(
-    `SELECT id, name, colour, photo, created_at FROM children
+    `SELECT ${CHILD_COLS} FROM children
      WHERE deleted = 0 AND lower(trim(name)) = lower(trim(?)) AND id != ? LIMIT 1`,
     name, exceptId ?? '',
   );
@@ -676,4 +696,144 @@ export async function mergeChildren(db: SQLiteDatabase, keepId: string, dupeId: 
     if (keep && dupe && !keep.photo && dupe.photo) await updateChild(db, keepId, keep.name, keep.colour, dupe.photo);
     await removeChild(db, dupeId);
   });
+}
+
+// ---------- Gifts waiting to be paid ----------
+
+export async function markGiftPaid(db: SQLiteDatabase, gift: { id: string; child_id: string; title: string }) {
+  await insertEntry(db, {
+    child_id: gift.child_id, type: 'paid', amount_pence: 0, activity_id: null, goal_id: null, ref_id: gift.id,
+    title: `Paid: ${gift.title}`, environment: null, note: null, for_date: localDay(),
+  });
+}
+
+export interface GiftToPay {
+  id: string;
+  child_id: string;
+  child_name: string;
+  title: string;
+  amount_pence: number; // positive
+  note: string | null;
+  day: string;
+}
+
+export async function giftsToPay(db: SQLiteDatabase) {
+  return db.getAllAsync<GiftToPay>(
+    `SELECT e.id, e.child_id, c.name AS child_name, e.title, -e.amount_pence AS amount_pence, e.note,
+       COALESCE(e.for_date, date(e.created_at, 'localtime')) AS day
+     FROM entries e JOIN children c ON c.id = e.child_id
+     WHERE e.type = 'give' AND c.deleted = 0
+       AND e.id NOT IN (SELECT ref_id FROM entries WHERE type IN ('undo', 'paid') AND ref_id IS NOT NULL)
+     ORDER BY day, e.created_at`,
+  );
+}
+
+// ---------- Favourite rewards ----------
+
+// The activities a child is rewarded for most often lately, for one-tap rewards
+export async function favouriteActivities(db: SQLiteDatabase, childId: string, limit = 3) {
+  return db.getAllAsync<Activity & { uses: number }>(
+    `SELECT a.id, a.title, a.environment, a.default_pence, a.archived, a.created_at, COUNT(*) AS uses
+     FROM entries e JOIN activities a ON a.id = e.activity_id
+     WHERE e.child_id = ? AND e.type = 'reward' AND a.archived = 0 AND e.created_at >= ?
+       AND e.id NOT IN (SELECT ref_id FROM entries WHERE type = 'undo' AND ref_id IS NOT NULL)
+     GROUP BY a.id ORDER BY uses DESC, MAX(e.created_at) DESC LIMIT ?`,
+    childId, new Date(Date.now() - 60 * 864e5).toISOString(), limit,
+  );
+}
+
+// ---------- Goal photo ----------
+
+export async function setGoalPhoto(db: SQLiteDatabase, goalId: string, photo: string | null) {
+  const { ts, dev, rev } = await stamp(db);
+  await db.runAsync('UPDATE goals SET photo = ?, updated_at = ?, device_id = ?, rev = ? WHERE id = ?', photo, ts, dev, rev, goalId);
+}
+
+// ---------- Pocket money and saving bonus ----------
+
+export async function setPocketMoney(db: SQLiteDatabase, childId: string, pence: number, day: number) {
+  const c = await getChild(db, childId);
+  if (!c) return;
+  const since = pence > 0 ? (c.pocket_pence && c.pocket_since ? c.pocket_since : localDay()) : null;
+  const { ts, dev, rev } = await stamp(db);
+  await db.runAsync(
+    'UPDATE children SET pocket_pence = ?, pocket_day = ?, pocket_since = ?, updated_at = ?, device_id = ?, rev = ? WHERE id = ?',
+    pence, day, since, ts, dev, rev, childId,
+  );
+}
+
+async function balanceBefore(db: SQLiteDatabase, childId: string, day: string) {
+  const row = await db.getFirstAsync<{ total: number | null }>(
+    `SELECT SUM(amount_pence) AS total FROM entries WHERE child_id = ? AND ${DAY} < ? AND ${LIVE_ENTRIES}`,
+    childId, day,
+  );
+  return row?.total ?? 0;
+}
+
+export async function setSavingBonus(db: SQLiteDatabase, percent: number) {
+  await setPref(db, 'bonus_pct', String(percent));
+  // Bonuses start from next month, never backdated
+  if (percent > 0) await setPref(db, 'bonus_since', localDay().slice(0, 7));
+}
+
+export async function savingBonus(db: SQLiteDatabase) {
+  return Number((await getPref(db, 'bonus_pct')) ?? 0) || 0;
+}
+
+/*
+ * Adds pocket money due since it was set up, and the monthly saving bonus.
+ * Each entry has a fixed id (child + date), so running this on both paired
+ * phones, or many times a day, still adds each one once.
+ */
+export async function applyScheduled(db: SQLiteDatabase, today: string = localDay()): Promise<number> {
+  let added = 0;
+  const children = await listChildren(db);
+
+  for (const c of children) {
+    if (!c.pocket_pence || !c.pocket_since) continue;
+    const start = c.pocket_since > shiftDays(today, -56) ? c.pocket_since : shiftDays(today, -56);
+    for (let d = start; d <= today; d = shiftDays(d, 1)) {
+      if (weekday(d) !== (c.pocket_day ?? 6)) continue;
+      const r = await insertEntry(db, {
+        child_id: c.id, type: 'reward', amount_pence: c.pocket_pence, activity_id: null, goal_id: c.goal?.id ?? null,
+        ref_id: null, title: 'Pocket money', environment: 'home', note: null, for_date: d,
+      }, undefined, `pocket-${c.id}-${d}`);
+      added += r.changes;
+    }
+  }
+
+  const pct = await savingBonus(db);
+  const since = await getPref(db, 'bonus_since');
+  if (pct > 0 && since) {
+    const thisMonth = today.slice(0, 7);
+    for (let m = nextMonth(since); m <= thisMonth; m = nextMonth(m)) {
+      const first = `${m}-01`;
+      for (const c of children) {
+        const saved = await balanceBefore(db, c.id, first);
+        const bonus = Math.round((saved * pct) / 100);
+        if (bonus <= 0) continue;
+        const r = await insertEntry(db, {
+          child_id: c.id, type: 'bonus', amount_pence: bonus, activity_id: null, goal_id: c.goal?.id ?? null,
+          ref_id: null, title: `Saving bonus (${pct}%)`, environment: null, note: null, for_date: first,
+        }, undefined, `bonus-${c.id}-${m}`);
+        added += r.changes;
+      }
+    }
+  }
+  return added;
+}
+
+function shiftDays(day: string, n: number) {
+  const [y, m, d] = day.split('-').map(Number);
+  return localDay(new Date(y, m - 1, d + n));
+}
+
+function weekday(day: string) {
+  const [y, m, d] = day.split('-').map(Number);
+  return new Date(y, m - 1, d).getDay();
+}
+
+function nextMonth(ym: string) {
+  const [y, m] = ym.split('-').map(Number);
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
 }

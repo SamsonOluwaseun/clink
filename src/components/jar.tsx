@@ -6,7 +6,8 @@ const BODY = 'M58 70 Q40 70 40 88 V182 Q40 204 62 204 H138 Q160 204 160 182 V88 
 
 // A jar that fills with lime as the child gets closer to their goal.
 export function Jar({ progress, size = 180 }: { progress: number; size?: number }) {
-  const p = Math.max(0, Math.min(1, progress));
+  // Any money saved shows at least a layer of coins: an empty-looking jar never encourages anyone
+  const p = progress > 0 ? Math.max(0.08, Math.min(1, progress)) : 0;
   const top = 70;
   const bottom = 204;
   const level = bottom - (bottom - top) * p;

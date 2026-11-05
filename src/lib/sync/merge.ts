@@ -24,8 +24,8 @@ export interface ChangeSet {
 }
 
 const COLUMNS = {
-  children: ['id', 'name', 'colour', 'photo', 'created_at', 'updated_at', 'device_id', 'deleted'],
-  goals: ['id', 'child_id', 'title', 'target_pence', 'status', 'created_at', 'bought_at', 'updated_at', 'device_id', 'deleted', 'evidence'],
+  children: ['id', 'name', 'colour', 'photo', 'created_at', 'updated_at', 'device_id', 'deleted', 'pocket_pence', 'pocket_day', 'pocket_since'],
+  goals: ['id', 'child_id', 'title', 'target_pence', 'status', 'created_at', 'bought_at', 'updated_at', 'device_id', 'deleted', 'evidence', 'photo'],
   activities: ['id', 'title', 'environment', 'default_pence', 'archived', 'created_at', 'updated_at', 'device_id'],
   prefs: ['id', 'value', 'updated_at', 'device_id'],
   entries: ['id', 'child_id', 'type', 'amount_pence', 'activity_id', 'goal_id', 'ref_id', 'title', 'environment', 'note', 'for_date', 'created_at', 'device_id'],
@@ -57,7 +57,7 @@ export async function applyChanges(db: SQLiteDatabase, set: Partial<Omit<ChangeS
   await db.withTransactionAsync(async () => {
     // Entries: keep anything new
     for (const r of set.entries ?? []) {
-      const cols = COLUMNS.entries;
+      const cols = present(COLUMNS.entries, r);
       const res = await db.runAsync(
         `INSERT OR IGNORE INTO entries (${cols.join(', ')}, rev) VALUES (${cols.map(() => '?').join(', ')}, ?)`,
         ...cols.map((c) => r[c] ?? null), await nextRev(db),
@@ -67,8 +67,9 @@ export async function applyChanges(db: SQLiteDatabase, set: Partial<Omit<ChangeS
 
     // Editable tables: newer edit wins
     for (const table of ['children', 'goals', 'activities', 'prefs'] as const) {
-      const cols = COLUMNS[table];
       for (const r of set[table] ?? []) {
+        // An older phone leaves newer columns out: keep this phone's values for those
+        const cols = present(COLUMNS[table], r);
         const mine = await db.getFirstAsync<{ updated_at: string; device_id: string }>(
           `SELECT updated_at, device_id FROM ${table} WHERE id = ?`, r.id,
         );
@@ -90,6 +91,10 @@ export async function applyChanges(db: SQLiteDatabase, set: Partial<Omit<ChangeS
     }
   });
   return changed;
+}
+
+function present(cols: readonly string[], r: Row) {
+  return cols.filter((c) => c in r);
 }
 
 function isNewer(theirs: Row, mine: { updated_at: string; device_id: string }) {

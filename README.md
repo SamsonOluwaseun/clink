@@ -54,6 +54,27 @@ An iPhone version is planned. Installing apps outside the App Store on iPhone ne
 - **Goal reached.** Tap "We bought it" and take a photo of your child with it. The photo is saved to a **Clink** album in your phone's gallery and kept in the app. The cost comes out of the jar, and anything extra carries over to the next goal.
 - **Two-parent sync on home Wi-Fi.** Pair two phones once by scanning a QR code. After that, rewards, goals and photos given on one phone appear on the other whenever both have Clink open on the same Wi-Fi. No account, no internet server.
 
+## Built on what works for children
+
+Clink's encouragement features follow research on motivation and money habits:
+
+- **Praise the effort.** Each reward comes with praise such as "You kept going, even when it was hard", shown to the child. Children praised for effort persist longer than children praised for being clever (Mueller and Dweck, 1998).
+- **Celebrate straight away.** A coin drops into the jar with a clink, right after the good deed, rather than as a total at the weekend.
+- **Milestones.** A star at each quarter of the goal, and a celebration when one is reached. People speed up as a goal gets close (the goal-gradient effect, Kivetz and others, 2006).
+- **See the goal.** A photo of the real toy sits on the jar.
+- **Patience pays.** An optional monthly saving bonus of 5% or 10% on what is still in the jar. Research for the UK Money Advice Service found money habits are largely formed by age 7 (Whitebread and Bingham, 2013).
+- **Praise only.** Not everything needs money. Rewarding a child for something they already enjoy can reduce their own interest in it (Lepper, Greene and Nisbett, 1973), so a reward can be praise alone.
+- **No comparisons, no penalties.** Each child's jar is about their own progress, and money is never taken away as punishment.
+
+## Made easy for parents
+
+- **One tap.** Each child's most-used rewards appear as buttons on their card.
+- **Show me.** A big, simple view of the jar, goal and praise to hand to the child.
+- **Pocket money.** An optional weekly amount added automatically on the day you choose.
+- **Gifts to pay.** Tithes and offerings wait on a list until you tick them off as paid.
+- **Reminders.** A Sunday evening summary, a Saturday reminder of gifts to pay in, and a gentle nudge when a child hasn't been rewarded for a few days. All scheduled on the phone, no server.
+- **Backup.** Save everything to a file in Google Drive, email or Files, and restore it on a new phone. Restoring twice never doubles anything.
+
 ## Two-parent sync
 
 1. On the phone that already has your children set up, tap **Sync**, then **Show pairing code**.

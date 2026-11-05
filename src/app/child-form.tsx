@@ -2,8 +2,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import { Avatar, Button, Field, Text } from '@/components/ui';
-import { addChild, findChildByName, getChild, removeChild, updateChild } from '@/lib/db';
+import { Avatar, Button, Chip, Field, Text } from '@/components/ui';
+import { addChild, findChildByName, getChild, removeChild, setPocketMoney, updateChild } from '@/lib/db';
+import { formatMoney, money, parseMoney, toMajorText } from '@/lib/money';
 import { useDb, useRefresh } from '@/lib/data';
 import { pickChildPhoto } from '@/lib/photos';
 import { avatarColours, colors } from '@/lib/theme';
@@ -15,6 +16,9 @@ export default function ChildForm() {
   const [name, setName] = useState('');
   const [colour, setColour] = useState(avatarColours[0]);
   const [photo, setPhoto] = useState<string | null>(null);
+  const [pocket, setPocket] = useState('');
+  const [pocketDay, setPocketDay] = useState(6);
+  const cur = money();
   const [busy, setBusy] = useState(false);
   const saving = useRef(false); // stops a quick double tap adding the child twice
 
@@ -25,6 +29,8 @@ export default function ChildForm() {
         setName(c.name);
         setColour(c.colour);
         setPhoto(c.photo);
+        if (c.pocket_pence) setPocket(toMajorText(c.pocket_pence));
+        setPocketDay(c.pocket_day ?? 6);
       }
     });
   }, [db, id]);
@@ -38,6 +44,8 @@ export default function ChildForm() {
       setBusy(false);
     }
   };
+
+  const pocketPence = pocket.trim() ? parseMoney(pocket) : 0;
 
   const save = async () => {
     if (!name.trim() || saving.current) return;
@@ -54,11 +62,13 @@ export default function ChildForm() {
       }
       if (id) {
         await updateChild(db, id, name, colour, photo);
+        await setPocketMoney(db, id, pocketPence ?? 0, pocketDay);
         refresh();
         router.back();
         return;
       }
       const newId = await addChild(db, name, colour, photo);
+      if (pocketPence) await setPocketMoney(db, newId, pocketPence, pocketDay);
       refresh();
       // Straight on to their first goal
       router.replace({ pathname: '/goal', params: { childId: newId, first: '1' } });
@@ -111,7 +121,23 @@ export default function ChildForm() {
           ))}
         </View>
       </View>
-      <Button label={id ? 'Save' : 'Next: set a goal'} disabled={!name.trim() || busy} onPress={save} />
+      <View style={{ gap: 10 }}>
+        <Text variant="label">Weekly pocket money (optional)</Text>
+        <Field label={`Amount each week (${cur.symbol})`} placeholder={`e.g. ${toMajorText(cur.targets[0] / 2)}`} value={pocket} onChangeText={setPocket} keyboardType="decimal-pad" />
+        {pocket.trim().length > 0 && pocketPence == null && <Text variant="small" style={{ color: colors.danger }}>That amount does not look right.</Text>}
+        {!!pocketPence && (
+          <>
+            <Text variant="small">Added to the jar every</Text>
+            <View style={styles.colours}>
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d, i) => (
+                <Chip key={d} label={d} selected={pocketDay === i} tint={colors.navy} onPress={() => setPocketDay(i)} />
+              ))}
+            </View>
+            <Text variant="small">{`${formatMoney(pocketPence)} goes in automatically each week, starting this week.`}</Text>
+          </>
+        )}
+      </View>
+      <Button label={id ? 'Save' : 'Next: set a goal'} disabled={!name.trim() || busy || pocketPence == null} onPress={save} />
       {id && <Button kind="danger" label="Remove child" onPress={remove} />}
     </ScrollView>
   );

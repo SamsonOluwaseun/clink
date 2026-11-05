@@ -4,8 +4,11 @@ import * as db from '../src/lib/db';
 import { familyIdFor, newFamilyKey, open, seal } from '../src/lib/sync/crypto';
 import { exchange, findPeers, listPeers, startServer } from '../src/lib/sync/net';
 import { FakeDb } from './shims/sqlite';
-import { addDays, localDay, weekStart } from '../src/lib/dates';
+import { addDays, localDay, parseDay, weekStart } from '../src/lib/dates';
+import { applyChanges, collectChanges } from '../src/lib/sync/merge';
 import { currencies, formatMoney, parseMoney, tithe } from '../src/lib/money';
+import { makeBackup, restoreBackup } from '../src/lib/backup';
+import { milestoneCrossed, starsFor } from '../src/lib/encourage';
 
 const g = globalThis as any;
 let passed = 0;
@@ -229,6 +232,87 @@ async function main() {
   assert.equal(adaOnA.find((e) => e.title === 'Tidied')?.day, yesterday);
   assert.deepEqual(await db.givingTotals(A, ada), { tithe: 30, offering: 50 });
   ok('currency, reward dates and gifts sync to the other phone');
+
+  console.log('Version 0.4: pocket money, bonus, gifts to pay, favourites, backup');
+  const F = new FakeDb() as any;
+  await db.migrate(F);
+  const kid = await db.addChild(F, 'Ben', '#4392F1', null);
+  // Pocket money set up three weeks ago on Saturdays
+  await db.setPocketMoney(F, kid, 200, 6);
+  await F.runAsync('UPDATE children SET pocket_since = ? WHERE id = ?', addDays(today, -21), kid);
+  const n1 = await db.applyScheduled(F);
+  const n2 = await db.applyScheduled(F);
+  assert.ok(n1 >= 3 && n1 <= 4, `pocket money weeks added: ${n1}`);
+  assert.equal(n2, 0);
+  ok(`pocket money added for each week due (${n1}), and never twice`);
+  // A second phone working out the same pocket money makes the same entries
+  const F2 = new FakeDb() as any;
+  await db.migrate(F2);
+  await applyChanges(F2, { children: await F.getAllAsync('SELECT id, name, colour, photo, created_at, updated_at, device_id, deleted, pocket_pence, pocket_day, pocket_since FROM children') });
+  await db.applyScheduled(F2);
+  await applyChanges(F2, await collectChanges(F, 0));
+  assert.equal(await db.balance(F2, kid), await db.balance(F, kid));
+  ok('two phones adding pocket money end with the same balance');
+
+  // Monthly saving bonus on last month's balance
+  await db.setPref(F, 'bonus_pct', '10');
+  const lastMonth = (() => { const d = parseDay(today); d.setDate(1); d.setMonth(d.getMonth() - 1); return localDay(d).slice(0, 7); })();
+  await db.setPref(F, 'bonus_since', lastMonth);
+  await db.giveReward(F, { childId: kid, activity: null, title: 'Old reward', environment: 'home', pence: 1000, forDate: `${lastMonth}-05` });
+  const beforeBonus = await db.balance(F, kid);
+  await db.applyScheduled(F);
+  await db.applyScheduled(F);
+  const bonusRow = await F.getFirstAsync("SELECT amount_pence, for_date FROM entries WHERE type = 'bonus'");
+  assert.ok(bonusRow && bonusRow.amount_pence >= 100, `bonus ${bonusRow?.amount_pence}`);
+  assert.equal(await db.balance(F, kid), beforeBonus + bonusRow.amount_pence);
+  ok(`10% saving bonus added once on the 1st (${formatMoney(bonusRow.amount_pence, currencies.GBP)})`);
+
+  // Gifts waiting to be paid
+  await db.recordGift(F, { childId: kid, kind: 'tithe', pence: 40 });
+  let due = await db.giftsToPay(F);
+  assert.equal(due.length, 1);
+  assert.equal(due[0].amount_pence, 40);
+  const balBefore = await db.balance(F, kid);
+  await db.markGiftPaid(F, due[0]);
+  due = await db.giftsToPay(F);
+  assert.equal(due.length, 0);
+  assert.equal(await db.balance(F, kid), balBefore);
+  const giftRow = (await db.listEntries(F, kid)).find((e) => e.type === 'give');
+  assert.equal(giftRow?.paid, 1);
+  assert.ok(!(await db.listEntries(F, kid)).some((e) => e.type === 'paid'));
+  ok('gifts wait on the to-pay list until marked paid, without touching the balance');
+
+  // Favourites and praise-only rewards
+  const homeActs = await db.listActivities(F, 'home');
+  for (let i = 0; i < 3; i++) await db.giveReward(F, { childId: kid, activity: homeActs[2], title: homeActs[2].title, environment: 'home', pence: 0, note: 'Great effort!' });
+  await db.giveReward(F, { childId: kid, activity: homeActs[0], title: homeActs[0].title, environment: 'home', pence: 50 });
+  const favs = await db.favouriteActivities(F, kid);
+  assert.equal(favs[0].id, homeActs[2].id);
+  ok('favourites put the most-used reward first; praise-only rewards are allowed');
+
+  // Milestones
+  assert.equal(milestoneCrossed(400, 600, 1000), 50);
+  assert.equal(milestoneCrossed(100, 800, 1000), 75);
+  assert.equal(milestoneCrossed(900, 1000, 1000), 100);
+  assert.equal(milestoneCrossed(510, 600, 1000), null);
+  assert.equal(starsFor(760, 1000), 3);
+  ok('milestones fire at each quarter, once');
+
+  // Backup and restore
+  await db.addGoal(F, kid, 'Scooter', 3000);
+  const goalId = (await db.activeGoal(F, kid))!.id;
+  await db.setGoalPhoto(F, goalId, 'c2Nvb3Rlcg==');
+  const file = JSON.stringify(await makeBackup(F));
+  const G = new FakeDb() as any;
+  await db.migrate(G);
+  await restoreBackup(G, file);
+  const again = await restoreBackup(G, file);
+  assert.equal(await db.balance(G, kid), await db.balance(F, kid));
+  assert.equal((await db.listChildren(G)).length, 1);
+  assert.equal((await db.activeGoal(G, kid))?.photo, 'c2Nvb3Rlcg==');
+  assert.equal(again, 0);
+  await assert.rejects(() => restoreBackup(G, '{"hello":1}'));
+  ok('backup restores everything, restoring twice adds nothing, other files are refused');
 
   stopA();
   console.log(`\nAll ${passed} checks passed`);

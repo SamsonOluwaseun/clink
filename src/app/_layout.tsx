@@ -6,6 +6,7 @@ import { useEffect } from 'react';
 
 import { CurrencyProvider } from '@/lib/currency';
 import { DataProvider } from '@/lib/data';
+import { RoutineProvider } from '@/lib/routine';
 import { SyncProvider } from '@/lib/sync';
 import { colors, fonts } from '@/lib/theme';
 
@@ -24,6 +25,7 @@ export default function RootLayout() {
     <DataProvider>
       <SyncProvider>
       <CurrencyProvider>
+      <RoutineProvider>
       <StatusBar style="dark" />
       <Stack
         screenOptions={{
@@ -46,7 +48,11 @@ export default function RootLayout() {
         <Stack.Screen name="give" options={{ presentation: 'modal', title: 'Tithe or offering' }} />
         <Stack.Screen name="report" options={{ title: 'Weekly report' }} />
         <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+        <Stack.Screen name="celebrate" options={{ presentation: 'fullScreenModal', headerShown: false, animation: 'fade' }} />
+        <Stack.Screen name="show/[id]" options={{ presentation: 'fullScreenModal', headerShown: false, animation: 'fade' }} />
+        <Stack.Screen name="to-pay" options={{ title: 'Gifts to pay' }} />
       </Stack>
+      </RoutineProvider>
       </CurrencyProvider>
       </SyncProvider>
     </DataProvider>

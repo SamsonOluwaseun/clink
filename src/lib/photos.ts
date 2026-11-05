@@ -47,7 +47,16 @@ async function shrink(uri: string, width: number) {
 
 // A child's photo: square, small enough to sync between phones in a moment
 export async function pickChildPhoto(): Promise<string | null> {
-  const source = await choosePhotoSource('Add a photo');
+  return pickSquarePhoto('Add a photo');
+}
+
+// What the child is saving for, shown on their jar
+export async function pickGoalPhoto(): Promise<string | null> {
+  return pickSquarePhoto('Photo of the goal');
+}
+
+async function pickSquarePhoto(title: string): Promise<string | null> {
+  const source = await choosePhotoSource(title);
   if (!source) return null;
   const uri = await pick(source, true);
   return uri ? shrink(uri, 256) : null;

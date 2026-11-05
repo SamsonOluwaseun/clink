@@ -26,7 +26,7 @@ export default function ReportScreen() {
       lines.push(`${r.child.name}: earned ${formatMoney(r.earned)} (home ${formatMoney(r.home)}, school ${formatMoney(r.school)})`);
       if (r.given) lines.push(`  Gave ${formatMoney(r.given)}`);
       for (const l of r.lines) {
-        lines.push(`  ${dayLabel(l.day)}: ${l.title} ${l.type === 'give' ? '-' : '+'}${formatMoney(Math.abs(l.amount_pence))}${l.note ? ` (${l.note})` : ''}`);
+        lines.push(`  ${dayLabel(l.day)}: ${l.title} ${amountText(l)}${l.note ? ` (${l.note})` : ''}`);
       }
       lines.push(`  Saved so far: ${formatMoney(r.child.balance)}${r.child.goal ? ` towards ${r.child.goal.title}` : ''}`, '');
     }
@@ -78,6 +78,11 @@ export default function ReportScreen() {
   );
 }
 
+function amountText(l: { type: string; amount_pence: number }) {
+  if (l.amount_pence === 0) return 'Praise';
+  return `${l.type === 'give' ? '-' : '+'}${formatMoney(Math.abs(l.amount_pence))}`;
+}
+
 function Total({ label, value }: { label: string; value: string }) {
   return (
     <View style={{ flex: 1 }}>
@@ -98,6 +103,7 @@ function ChildWeek({ r, days }: { r: ChildReport; days: string[] }) {
           <Text variant="heading">{r.child.name}</Text>
           <Text variant="small">
             Home {formatMoney(r.home)} · School {formatMoney(r.school)}
+            {r.bonus ? ` · Bonus ${formatMoney(r.bonus)}` : ''}
             {r.given ? ` · Gave ${formatMoney(r.given)}` : ''}
           </Text>
         </View>
@@ -124,7 +130,7 @@ function ChildWeek({ r, days }: { r: ChildReport; days: string[] }) {
       ) : (
         r.lines.map((l) => (
           <View key={l.id} style={styles.line}>
-            <View style={[styles.dot, { backgroundColor: l.type === 'give' ? colors.limeDeep : l.environment === 'school' ? colors.school : colors.blue }]} />
+            <View style={[styles.dot, { backgroundColor: l.type === 'give' || l.type === 'bonus' ? colors.limeDeep : l.environment === 'school' ? colors.school : colors.blue }]} />
             <View style={{ flex: 1 }}>
               <Text style={{ fontSize: 15 }}>{l.title}</Text>
               <Text variant="small">
@@ -133,8 +139,7 @@ function ChildWeek({ r, days }: { r: ChildReport; days: string[] }) {
               </Text>
             </View>
             <Text style={[styles.amount, l.type === 'give' && { color: colors.muted }]}>
-              {l.type === 'give' ? '-' : '+'}
-              {formatMoney(Math.abs(l.amount_pence))}
+              {amountText(l)}
             </Text>
           </View>
         ))

@@ -3,7 +3,10 @@ import { useEffect, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button, Chip, Field, Text } from '@/components/ui';
-import { addGoal, deleteGoal, getChild, getGoal, updateGoal } from '@/lib/db';
+import { Image } from 'expo-image';
+
+import { addGoal, deleteGoal, getChild, getGoal, setGoalPhoto, updateGoal } from '@/lib/db';
+import { pickGoalPhoto } from '@/lib/photos';
 import { useDb, useRefresh } from '@/lib/data';
 import { formatMoney, money, parseMoney, toMajorText } from '@/lib/money';
 import { colors } from '@/lib/theme';
@@ -19,6 +22,7 @@ export default function GoalScreen() {
   const [childName, setChildName] = useState('');
   const [title, setTitle] = useState('');
   const [amount, setAmount] = useState('');
+  const [photo, setPhoto] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -29,6 +33,7 @@ export default function GoalScreen() {
           cid = g.child_id;
           setTitle(g.title);
           setAmount(toMajorText(g.target_pence));
+          setPhoto(g.photo);
         }
       }
       setOwner(cid);
@@ -42,8 +47,10 @@ export default function GoalScreen() {
 
   const save = async () => {
     if (!ready || pence == null || !owner) return;
-    if (goalId) await updateGoal(db, goalId, title, pence);
-    else await addGoal(db, owner, title, pence);
+    let gid = goalId;
+    if (gid) await updateGoal(db, gid, title, pence);
+    else gid = await addGoal(db, owner, title, pence);
+    await setGoalPhoto(db, gid, photo);
     refresh();
     router.back();
   };
@@ -88,6 +95,24 @@ export default function GoalScreen() {
             <Field label={`Exact price (${cur.symbol})`} placeholder={cur.priceExample} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" />
           </View>
 
+          <View style={{ gap: 10 }}>
+            <Text variant="label">Photo of it (optional)</Text>
+            <View style={styles.photoRow}>
+              {photo ? (
+                <Image source={{ uri: `data:image/jpeg;base64,${photo}` }} style={styles.photo} contentFit="cover" accessibilityLabel="Photo of the goal" />
+              ) : (
+                <View style={[styles.photo, styles.noPhoto]}>
+                  <Text variant="small" style={{ color: colors.blueDark, textAlign: 'center' }}>No photo</Text>
+                </View>
+              )}
+              <View style={{ flex: 1, gap: 8 }}>
+                <Button kind="ghost" label={photo ? 'Change photo' : 'Add a photo'} onPress={async () => { const p = await pickGoalPhoto(); if (p) setPhoto(p); }} />
+                {photo && <Button kind="danger" label="Remove photo" onPress={() => setPhoto(null)} />}
+              </View>
+            </View>
+            <Text variant="small">A picture of the real toy on the jar keeps them going.</Text>
+          </View>
+
           <Button label={goalId ? 'Save changes' : 'Save goal'} disabled={!ready} onPress={save} />
           {goalId && <Button kind="danger" label="Delete goal" onPress={remove} />}
           {first === '1' && <Button kind="ghost" label="Skip for now" onPress={() => router.back()} />}
@@ -100,4 +125,7 @@ export default function GoalScreen() {
 const styles = StyleSheet.create({
   page: { padding: 16, gap: 18, paddingBottom: 48 },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  photoRow: { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  photo: { width: 96, height: 96, borderRadius: 20 },
+  noPhoto: { backgroundColor: colors.blueSoft, alignItems: 'center', justifyContent: 'center' },
 });

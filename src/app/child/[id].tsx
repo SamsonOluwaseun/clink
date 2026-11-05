@@ -3,7 +3,7 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
-import { Jar } from '@/components/jar';
+import { GoalJar, Stars } from '@/components/celebration';
 import { Avatar, Button, Card, PoweredBy, Text } from '@/components/ui';
 import {
   activeGoals,
@@ -21,6 +21,7 @@ import {
 } from '@/lib/db';
 import { useDb, useQuery, useRefresh } from '@/lib/data';
 import { dayLabel, localDay, weekStart } from '@/lib/dates';
+import { starsFor } from '@/lib/encourage';
 import { formatMoney } from '@/lib/money';
 import { photoSource, takeGoalPhoto } from '@/lib/photos';
 import { colors, fonts } from '@/lib/theme';
@@ -133,7 +134,7 @@ export default function ChildScreen() {
         <Card style={{ alignItems: 'center', gap: 8 }}>
           <View style={styles.jarRow}>
             <Avatar name={child.name} colour={child.colour} photo={child.photo} size={64} />
-            <Jar progress={goal ? progress : 0} size={150} />
+            <GoalJar progress={goal ? progress : 0} photo={goal?.photo} size={150} />
           </View>
           <Text style={styles.balance}>{formatMoney(child.balance)}</Text>
           {goal ? (
@@ -160,6 +161,13 @@ export default function ChildScreen() {
             label="Give a tithe or offering"
             style={{ alignSelf: 'stretch' }}
             onPress={() => router.push({ pathname: '/give', params: { childId: child.id } })}
+          />
+          {goal && <Stars count={starsFor(child.balance, target)} size={26} />}
+          <Button
+            kind="ghost"
+            label={`Show ${child.name}`}
+            style={{ alignSelf: 'stretch' }}
+            onPress={() => router.push({ pathname: '/show/[id]', params: { id: child.id } })}
           />
           {reached && <Button label="We bought it" style={{ alignSelf: 'stretch' }} onPress={confirmBought} />}
           {!goal && <Button kind="ghost" label="Set a goal" style={{ alignSelf: 'stretch' }} onPress={addGoal} />}
@@ -252,11 +260,11 @@ export default function ChildScreen() {
                   {dayLabel(e.day)}
                   {e.note ? ` · ${e.note}` : ''}
                   {e.undone ? ' · undone' : ''}
+                  {e.type === 'give' && !e.undone ? (e.paid ? ' · paid' : ' · to pay') : ''}
                 </Text>
               </View>
               <Text style={[styles.amount, e.amount_pence < 0 && { color: colors.muted }, e.undone ? styles.struck : null]}>
-                {e.amount_pence > 0 ? '+' : ''}
-                {formatMoney(e.amount_pence)}
+                {e.amount_pence === 0 ? 'Praise' : `${e.amount_pence > 0 ? '+' : ''}${formatMoney(e.amount_pence)}`}
               </Text>
             </Pressable>
           ))}
