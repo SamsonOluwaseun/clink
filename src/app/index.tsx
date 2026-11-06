@@ -143,7 +143,7 @@ function Favourites({ child }: { child: ChildSummary }) {
     await giveReward(db, { childId: child.id, activity: a, title: a.title, environment: a.environment, pence: a.default_pence, note: praise });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     refresh();
-    router.push({ pathname: '/celebrate', params: { childId: child.id, amount: String(a.default_pence), praise, before: String(child.balance) } });
+    router.push({ pathname: '/celebrate', params: { childId: child.id, amount: String(a.default_pence), title: a.title, praise, before: String(child.balance) } });
   };
 
   return (

@@ -1,12 +1,14 @@
 import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { GoalJar, Stars } from '@/components/celebration';
 import { Avatar, Button, Card, Text } from '@/components/ui';
 import { dayLabel } from '@/lib/dates';
+import { runCelebration } from '@/lib/cheer';
 import { getChild, listEntries } from '@/lib/db';
-import { useQuery } from '@/lib/data';
+import { useDb, useQuery } from '@/lib/data';
 import { starsFor } from '@/lib/encourage';
 import { formatMoney } from '@/lib/money';
 import { colors, fonts } from '@/lib/theme';
@@ -16,11 +18,15 @@ export default function ShowMe() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const child = useQuery((d) => getChild(d, id), [id]);
   const entries = useQuery((d) => listEntries(d, id, 30), [id]);
+  const db = useDb();
+  const stop = useRef<(() => void) | null>(null);
+  useEffect(() => () => stop.current?.(), []);
   if (!child) return <View style={styles.screen} />;
 
   const goal = child.goal;
   const target = goal?.target_pence ?? 0;
   const left = Math.max(0, target - child.balance);
+  const lastReward = (entries ?? []).find((e) => e.type === 'reward' && !e.undone);
   const praise = (entries ?? []).filter((e) => e.type === 'reward' && !e.undone && e.note).slice(0, 3);
 
   return (
@@ -57,6 +63,17 @@ export default function ShowMe() {
           </Card>
         )}
 
+        {lastReward && (
+          <Button
+            kind="lime"
+            label="Hear my last cheer"
+            style={{ alignSelf: 'stretch' }}
+            onPress={() => {
+              stop.current?.();
+              stop.current = runCelebration(db, { name: child.name, title: lastReward.title, amount: lastReward.amount_pence, praise: lastReward.note });
+            }}
+          />
+        )}
         <Button label="Close" onPress={() => router.back()} style={{ alignSelf: 'stretch' }} />
       </ScrollView>
     </SafeAreaView>

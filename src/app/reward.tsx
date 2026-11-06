@@ -54,7 +54,7 @@ export default function RewardScreen() {
     await giveReward(db, { childId, activity, title, environment: env, pence: amount, note: praise, forDate: day });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
     refresh();
-    router.replace({ pathname: '/celebrate', params: { childId, amount: String(amount), praise, before: String(before) } });
+    router.replace({ pathname: '/celebrate', params: { childId, amount: String(amount), title, praise, before: String(before) } });
   };
 
   return (

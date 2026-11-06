@@ -88,4 +88,57 @@ const styles = StyleSheet.create({
   badge: { position: 'absolute', borderWidth: 3, borderColor: colors.cream, backgroundColor: colors.blueSoft },
   coin: { position: 'absolute', backgroundColor: colors.lime, borderWidth: 4, borderColor: colors.navy },
   stars: { flexDirection: 'row', gap: 6, justifyContent: 'center' },
+  confetti: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' },
 });
+
+// Confetti falling across the screen, in the brand colours
+const CONFETTI_COLOURS = [colors.lime, colors.blue, colors.navy, colors.limeDeep, colors.blueDark];
+
+export function Confetti({ count = 36, width = 390, height = 800 }: { count?: number; width?: number; height?: number }) {
+  const [pieces] = useState(() =>
+    Array.from({ length: count }, (_, i) => ({
+      key: i,
+      x: Math.random() * width,
+      drift: (Math.random() - 0.5) * 120,
+      delay: Math.random() * 600,
+      size: 7 + Math.random() * 7,
+      round: Math.random() > 0.6,
+      colour: CONFETTI_COLOURS[i % CONFETTI_COLOURS.length],
+      spin: (Math.random() > 0.5 ? 1 : -1) * (360 + Math.random() * 540),
+      fall: new Animated.Value(0),
+    })),
+  );
+
+  useEffect(() => {
+    Animated.parallel(
+      pieces.map((p) =>
+        Animated.timing(p.fall, { toValue: 1, duration: 2200 + Math.random() * 900, delay: p.delay, easing: Easing.in(Easing.quad), useNativeDriver: true }),
+      ),
+    ).start();
+  }, [pieces]);
+
+  return (
+    <View pointerEvents="none" style={styles.confetti} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+      {pieces.map((p) => (
+        <Animated.View
+          key={p.key}
+          style={{
+            position: 'absolute',
+            left: p.x,
+            top: -20,
+            width: p.size,
+            height: p.round ? p.size : p.size * 0.45,
+            borderRadius: p.round ? p.size / 2 : 2,
+            backgroundColor: p.colour,
+            opacity: p.fall.interpolate({ inputRange: [0, 0.85, 1], outputRange: [1, 1, 0] }),
+            transform: [
+              { translateY: p.fall.interpolate({ inputRange: [0, 1], outputRange: [0, height + 40] }) },
+              { translateX: p.fall.interpolate({ inputRange: [0, 1], outputRange: [0, p.drift] }) },
+              { rotate: p.fall.interpolate({ inputRange: [0, 1], outputRange: ['0deg', `${p.spin}deg`] }) },
+            ],
+          }}
+        />
+      ))}
+    </View>
+  );
+}

@@ -75,7 +75,7 @@ export function Field({ label, ...rest }: TextInputProps & { label: string }) {
   return (
     <View style={{ gap: 6 }}>
       <Text variant="label">{label}</Text>
-      <TextInput placeholderTextColor="#9AA0AE" {...rest} style={styles.input} />
+      <TextInput placeholderTextColor="#9AA0AE" {...rest} style={[styles.input, rest.multiline && { minHeight: 76, paddingTop: 12, textAlignVertical: 'top' }]} />
     </View>
   );
 }

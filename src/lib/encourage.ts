@@ -1,7 +1,7 @@
-import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
 import type { SQLiteDatabase } from 'expo-sqlite';
 
-import { getSetting } from './db';
+import { getPref, getSetting, setPref } from './db';
+import { money, type Currency } from './money';
 
 /*
  * Praise that describes effort, not cleverness: children praised for how they
@@ -48,21 +48,58 @@ export function starsFor(balance: number, target: number) {
   return milestones.filter((m) => (balance / target) * 100 >= m).length;
 }
 
-// ---------- Sound ----------
+// ---------- The spoken message ----------
 
-let player: AudioPlayer | null = null;
+export const DEFAULT_PROUD = 'Mummy and Daddy are so proud of you!';
+
+// Money as it should be said out loud: "50 pence", "1 pound 50", "400 naira"
+export function spokenMoney(minor: number, c: Currency = money()): string {
+  const whole = Math.floor(Math.abs(minor) / 100);
+  const part = Math.abs(minor) % 100;
+  const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+  switch (c.code) {
+    case 'NGN':
+      return part ? `${whole} naira ${part} kobo` : plural(whole, 'naira', 'naira');
+    case 'USD':
+    case 'CAD':
+      if (!whole) return plural(part, 'cent', 'cents');
+      return part ? `${plural(whole, 'dollar', 'dollars')} ${part}` : plural(whole, 'dollar', 'dollars');
+    default:
+      if (!whole) return `${part} pence`;
+      return part ? `${plural(whole, 'pound', 'pounds')} ${part}` : plural(whole, 'pound', 'pounds');
+  }
+}
+
+export function celebrationMessage(a: { name: string; title: string; amount: number; praise?: string | null; proud: string }) {
+  const parts = [`Well done, ${a.name}!`];
+  if (a.title) parts.push(`${a.title.replace(/[.!]+$/, '')}.`);
+  if (a.amount > 0) parts.push(`${spokenMoney(a.amount)} in your jar.`);
+  const praise = a.praise?.trim();
+  if (praise && praise !== defaultPraise(a.title)) parts.push(/[.!?]$/.test(praise) ? praise : `${praise}!`);
+  parts.push(a.proud.trim() || DEFAULT_PROUD);
+  return parts.join(' ');
+}
+
+// The voice that matches the family's currency, so it sounds local
+export function speechLanguage(c: Currency = money()) {
+  return { GBP: 'en-GB', USD: 'en-US', CAD: 'en-CA', NGN: 'en-NG' }[c.code];
+}
+
+// ---------- Settings ----------
 
 export async function soundOn(db: SQLiteDatabase) {
   return (await getSetting(db, 'sound')) !== 'off';
 }
 
-export async function playClink(db: SQLiteDatabase) {
-  try {
-    if (!(await soundOn(db))) return;
-    if (!player) player = createAudioPlayer(require('../../assets/sounds/clink.wav'));
-    await player.seekTo(0);
-    player.play();
-  } catch {
-    // A missing sound never stops a reward
-  }
+export async function speechOn(db: SQLiteDatabase) {
+  return (await getSetting(db, 'speech')) !== 'off';
+}
+
+// Shared between paired phones, so both parents' phones say the same thing
+export async function proudMessage(db: SQLiteDatabase) {
+  return (await getPref(db, 'proud_message')) || DEFAULT_PROUD;
+}
+
+export async function setProudMessage(db: SQLiteDatabase, text: string) {
+  await setPref(db, 'proud_message', text.trim() || DEFAULT_PROUD);
 }

@@ -6,9 +6,10 @@ import { exchange, findPeers, listPeers, startServer } from '../src/lib/sync/net
 import { FakeDb } from './shims/sqlite';
 import { addDays, localDay, parseDay, weekStart } from '../src/lib/dates';
 import { applyChanges, collectChanges } from '../src/lib/sync/merge';
-import { currencies, formatMoney, parseMoney, tithe } from '../src/lib/money';
+import { currencies, formatMoney, parseMoney, setActiveCurrency, tithe } from '../src/lib/money';
 import { makeBackup, restoreBackup } from '../src/lib/backup';
-import { milestoneCrossed, starsFor } from '../src/lib/encourage';
+import { celebrationMessage, DEFAULT_PROUD, milestoneCrossed, proudMessage, setProudMessage, spokenMoney, starsFor } from '../src/lib/encourage';
+import { deleteVoice, listVoices } from '../src/lib/voices';
 
 const g = globalThis as any;
 let passed = 0;
@@ -313,6 +314,44 @@ async function main() {
   assert.equal(again, 0);
   await assert.rejects(() => restoreBackup(G, '{"hello":1}'));
   ok('backup restores everything, restoring twice adds nothing, other files are refused');
+
+  console.log('Version 0.5: the spoken celebration and parent voices');
+  assert.equal(spokenMoney(50, currencies.GBP), '50 pence');
+  assert.equal(spokenMoney(100, currencies.GBP), '1 pound');
+  assert.equal(spokenMoney(150, currencies.GBP), '1 pound 50');
+  assert.equal(spokenMoney(25, currencies.USD), '25 cents');
+  assert.equal(spokenMoney(200, currencies.CAD), '2 dollars');
+  assert.equal(spokenMoney(40000, currencies.NGN), '400 naira');
+  ok('money is said out loud naturally in every currency');
+  setActiveCurrency('GBP');
+  assert.equal(
+    celebrationMessage({ name: 'Tobi', title: 'Tidied bedroom', amount: 50, praise: 'Great effort!', proud: DEFAULT_PROUD }),
+    'Well done, Tobi! Tidied bedroom. 50 pence in your jar. Great effort! Mummy and Daddy are so proud of you!',
+  );
+  assert.equal(
+    celebrationMessage({ name: 'Ada', title: 'Kind to brother or sister', amount: 0, praise: 'Well done for: kind to brother or sister', proud: 'Mum is so proud of you!' }),
+    'Well done, Ada! Kind to brother or sister. Mum is so proud of you!',
+  );
+  ok('the spoken message names the child, the action, the money and who is proud');
+  const H = new FakeDb() as any;
+  await db.migrate(H);
+  assert.equal(await proudMessage(H), 'Mummy and Daddy are so proud of you!');
+  await setProudMessage(H, 'Mum and Dad are so proud of you!');
+  assert.equal(await proudMessage(H), 'Mum and Dad are so proud of you!');
+  await setProudMessage(H, '   ');
+  assert.equal(await proudMessage(H), DEFAULT_PROUD);
+  ok('"Mummy and Daddy are so proud of you!" by default, and editable');
+  await db.setPref(H, 'voice-a', JSON.stringify({ label: 'Mummy', data: 'AAAA', ms: 3000, created_at: today }));
+  await db.setPref(H, 'voice-b', JSON.stringify({ label: 'Daddy', data: 'BBBB', ms: 4000, created_at: today }));
+  const H2 = new FakeDb() as any;
+  await db.migrate(H2);
+  await applyChanges(H2, await collectChanges(H, 0));
+  assert.deepEqual((await listVoices(H2)).map((v) => v.label), ['Mummy', 'Daddy']);
+  assert.equal(await proudMessage(H2), DEFAULT_PROUD);
+  await deleteVoice(H, 'voice-a');
+  await applyChanges(H2, await collectChanges(H, 0));
+  assert.deepEqual((await listVoices(H2)).map((v) => v.label), ['Daddy']);
+  ok('recorded voices and the proud message sync to the other phone, deletes too');
 
   stopA();
   console.log(`\nAll ${passed} checks passed`);

@@ -1,13 +1,15 @@
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 
-import { Button, Card, Chip, PoweredBy, Text } from '@/components/ui';
+import { Button, Card, Chip, Field, PoweredBy, Text } from '@/components/ui';
 import { pickAndRestore, shareBackup } from '@/lib/backup';
-import { soundOn } from '@/lib/encourage';
+import { runCelebration } from '@/lib/cheer';
+import { DEFAULT_PROUD, proudMessage, setProudMessage, soundOn, speechOn } from '@/lib/encourage';
+import { listVoices } from '@/lib/voices';
 import { disableReminders, enableReminders, remindersOn } from '@/lib/reminders';
-import { getSetting, savingBonus, setCurrency, setSavingBonus, setSetting } from '@/lib/db';
+import { getSetting, listChildren, savingBonus, setCurrency, setSavingBonus, setSetting } from '@/lib/db';
 import { useDb, useQuery, useRefresh } from '@/lib/data';
 import { currencyList, formatMoney, money, type Currency } from '@/lib/money';
 import { useSync } from '@/lib/sync';
@@ -23,6 +25,27 @@ export default function Settings() {
   const bonus = useQuery(savingBonus);
   const lastBackup = useQuery((d) => getSetting(d, 'last_backup'));
   const [working, setWorking] = useState(false);
+  const speech = useQuery(speechOn);
+  const proud = useQuery(proudMessage);
+  const voices = useQuery(listVoices);
+  const children = useQuery(listChildren);
+  const [proudText, setProudText] = useState<string | null>(null);
+  const stopSample = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopSample.current?.(), []);
+
+  const saveProud = async () => {
+    if (proudText == null) return;
+    await setProudMessage(db, proudText);
+    setProudText(null);
+    refresh();
+  };
+
+  const sample = async () => {
+    if (proudText != null) await saveProud();
+    stopSample.current?.();
+    const name = children?.[0]?.name ?? 'superstar';
+    stopSample.current = runCelebration(db, { name, title: 'Tidied bedroom', amount: cur.quick[2], praise: 'Great effort!' });
+  };
 
   const toggleReminders = async (on: boolean) => {
     if (on) {
@@ -117,14 +140,45 @@ export default function Settings() {
       </Card>
 
       <Card style={{ gap: 4 }}>
-        <Text variant="heading" style={{ marginBottom: 6 }}>Encouragement</Text>
-        <Toggle label="Reminders" hint="Sunday summary, Saturday gifts to pay, a nudge after a quiet few days" value={!!reminders} onChange={toggleReminders} />
+        <Text variant="heading" style={{ marginBottom: 6 }}>Celebration</Text>
+        <Text variant="small">After every reward: coins drop into the jar, applause and confetti, then a spoken well done and your recorded voices.</Text>
         <Toggle
-          label="Clink sound"
-          hint="Plays when a coin drops into the jar"
+          label="Sounds"
+          hint="Coins dropping and applause"
           value={sound !== false}
           onChange={async (on) => { await setSetting(db, 'sound', on ? 'on' : 'off'); refresh(); }}
         />
+        <Toggle
+          label="Spoken message"
+          hint="Says the child’s name, what they did, and your message"
+          value={speech !== false}
+          onChange={async (on) => { await setSetting(db, 'speech', on ? 'on' : 'off'); refresh(); }}
+        />
+        <Field
+          label="Who is proud"
+          value={proudText ?? proud ?? DEFAULT_PROUD}
+          onChangeText={setProudText}
+          onEndEditing={saveProud}
+          onBlur={saveProud}
+          multiline
+          placeholder={DEFAULT_PROUD}
+        />
+        <Text variant="small">Said at the end of every celebration, on both parents&rsquo; phones.</Text>
+        <Pressable accessibilityRole="button" onPress={() => router.push('/voices')} style={styles.row}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontFamily: fonts.semibold }}>Parent voices</Text>
+            <Text variant="small">
+              {voices?.length ? `${voices.map((v) => v.label).join(' and ')} recorded` : 'Record your own message to play in every celebration'}
+            </Text>
+          </View>
+          <Text style={styles.chev}>›</Text>
+        </Pressable>
+        <Button kind="ghost" label="Hear a sample" onPress={sample} style={{ marginTop: 8 }} />
+      </Card>
+
+      <Card style={{ gap: 4 }}>
+        <Text variant="heading" style={{ marginBottom: 6 }}>Encouragement</Text>
+        <Toggle label="Reminders" hint="Sunday summary, Saturday gifts to pay, a nudge after a quiet few days" value={!!reminders} onChange={toggleReminders} />
         <View style={{ gap: 8, paddingTop: 8 }}>
           <Text style={{ fontFamily: fonts.semibold }}>Monthly saving bonus</Text>
           <Text variant="small">On the 1st of each month, add a little extra on whatever is still in each jar. It shows children that patience pays.</Text>

@@ -5,3 +5,4 @@ export const shareAsync = async () => {};
 export const isAvailableAsync = async () => false;
 export class File { constructor(..._: unknown[]) {} }
 export const Paths = { cache: '', document: '' };
+export const RecordingPresets = { HIGH_QUALITY: {}, LOW_QUALITY: {} };

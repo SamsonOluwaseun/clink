@@ -51,6 +51,7 @@ export default function RootLayout() {
         <Stack.Screen name="celebrate" options={{ presentation: 'fullScreenModal', headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="show/[id]" options={{ presentation: 'fullScreenModal', headerShown: false, animation: 'fade' }} />
         <Stack.Screen name="to-pay" options={{ title: 'Gifts to pay' }} />
+        <Stack.Screen name="voices" options={{ title: 'Parent voices' }} />
       </Stack>
       </RoutineProvider>
       </CurrencyProvider>
