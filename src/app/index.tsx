@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { useEffect, useRef } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -6,7 +7,7 @@ import { CoinLogo, Jar } from '@/components/jar';
 import { Avatar, Button, Card, PoweredBy, ProgressBar, Text } from '@/components/ui';
 import * as Haptics from 'expo-haptics';
 
-import { duplicateGroups, favouriteActivities, giftsToPay, giveReward, listChildren, mergeChildren, setSetting, type Activity, type ChildSummary } from '@/lib/db';
+import { duplicateGroups, favouriteActivities, giftsToPay, giveReward, listChildren, mergeChildren, setSetting, type Activity, type ChildSummary, getSetting } from '@/lib/db';
 import { defaultPraise } from '@/lib/encourage';
 import { enableReminders, remindersAsked } from '@/lib/reminders';
 import { useDb, useQuery, useRefresh } from '@/lib/data';
@@ -21,6 +22,16 @@ export default function Home() {
   const gifts = useQuery(giftsToPay);
   const asked = useQuery(remindersAsked);
   const giftTotal = gifts?.reduce((s, g) => s + g.amount_pence, 0) ?? 0;
+  const guideSeen = useQuery((d) => getSetting(d, 'guide_seen'));
+  const opened = useRef(false);
+
+  // The quick guide opens by itself the first time Clink is used
+  useEffect(() => {
+    if (guideSeen === null && !opened.current) {
+      opened.current = true;
+      router.push('/guide');
+    }
+  }, [guideSeen]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.cream }} edges={['top']}>
@@ -31,6 +42,9 @@ export default function Home() {
             <CoinLogo size={24} />
           </View>
           <View style={styles.headerButtons}>
+            <Pressable accessibilityRole="button" accessibilityLabel="How to use Clink" onPress={() => router.push('/guide')} style={[styles.pill, styles.help]}>
+              <Text variant="label" style={{ color: colors.blueDark, fontSize: 18 }}>?</Text>
+            </Pressable>
             <Pressable accessibilityRole="button" onPress={() => router.push('/report')} style={styles.pill}>
               <Text variant="label" style={{ color: colors.blueDark }}>Report</Text>
             </Pressable>
@@ -230,6 +244,7 @@ function EmptyState() {
       </Text>
       <Button label="Add your first child" onPress={() => router.push('/child-form')} style={{ alignSelf: 'stretch' }} />
       <Button kind="ghost" label="Join another parent's phone" onPress={() => router.push('/sync')} style={{ alignSelf: 'stretch' }} />
+      <Button kind="ghost" label="Take the quick guide" onPress={() => router.push('/guide')} style={{ alignSelf: 'stretch' }} />
       <Pressable accessibilityRole="button" onPress={() => router.push('/settings')}>
         <Text variant="small" style={{ textAlign: 'center' }}>
           Currency: {cur.symbol} {cur.name} · <Text variant="small" style={{ color: colors.blueDark, fontFamily: fonts.semibold }}>Change</Text>
@@ -247,6 +262,7 @@ const styles = StyleSheet.create({
   headerButtons: { flexDirection: 'row', gap: 8 },
   pill: { minHeight: 44, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 6, borderRadius: 22, backgroundColor: colors.blueSoft },
   syncDot: { width: 9, height: 9, borderRadius: 5 },
+  help: { width: 44, paddingHorizontal: 0, justifyContent: 'center' },
   sectionHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   addPill: { minHeight: 44, paddingHorizontal: 16, justifyContent: 'center', borderRadius: 22, backgroundColor: colors.navy },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 },

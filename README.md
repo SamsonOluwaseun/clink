@@ -21,6 +21,8 @@
 
 ---
 
+**New to Clink?** Read the [quick user guide](docs/USER_GUIDE.md), or tap **?** on the home screen.
+
 ## Why Clink
 
 A tidy bedroom earns 50p. Homework done earns £1. A good week on ClassDojo earns £1 more. Each reward goes into a jar on screen, and the jar fills up towards the toy car, plane or day out your child has chosen. When it's full, you buy it together.

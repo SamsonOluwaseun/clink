@@ -192,6 +192,7 @@ export default function Settings() {
       </Card>
 
       <Card style={{ gap: 0 }}>
+        <Row label="How to use Clink" hint="The quick guide, step by step" onPress={() => router.push('/guide')} />
         <Row label="Gifts to pay" hint="Tithes and offerings waiting to be paid in" onPress={() => router.push('/to-pay')} />
         <Row label="Activities" hint="Home and school activities and their usual rewards" onPress={() => router.push('/manage')} />
         <Row
