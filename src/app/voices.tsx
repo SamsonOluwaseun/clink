@@ -7,7 +7,7 @@ import {
   type AudioPlayer,
 } from 'expo-audio';
 import { useEffect, useRef, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button, Card, Chip, Field, PoweredBy, Text } from '@/components/ui';
 import { useDb, useQuery, useRefresh } from '@/lib/data';
@@ -33,7 +33,10 @@ export default function Voices() {
   const start = async () => {
     const perm = await requestRecordingPermissionsAsync();
     if (!perm.granted) {
-      Alert.alert('Microphone not allowed', 'Turn on microphone access for Clink in your phone settings to record a message.');
+      Alert.alert('Microphone not allowed', 'Clink needs the microphone to record your message. Turn it on in your phone settings: Permissions, then Microphone, then Allow.', [
+        { text: 'Not now', style: 'cancel' },
+        { text: 'Open settings', onPress: () => Linking.openSettings() },
+      ]);
       return;
     }
     setTake(null);

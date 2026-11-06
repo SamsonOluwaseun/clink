@@ -54,6 +54,14 @@ jobs:
       - name: Generate the Android project
         run: npx expo prebuild --platform android --no-install
 
+      - name: Check the app declares the permissions it needs
+        run: |
+          M=android/app/src/main/AndroidManifest.xml
+          for P in CAMERA RECORD_AUDIO; do
+            grep -q "android.permission.$P\"/>" "$M" || { echo "Missing permission $P (a plugin setting may be removing it)"; grep "$P" "$M"; exit 1; }
+          done
+          echo "Camera and microphone permissions are declared"
+
       - name: Build the release APK
         working-directory: android
         run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=arm64-v8a,armeabi-v7a

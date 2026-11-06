@@ -2,7 +2,7 @@
   "expo": {
     "name": "Clink",
     "slug": "clink",
-    "version": "0.5.0",
+    "version": "0.5.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "clink",
@@ -49,15 +49,15 @@
         {
           "photosPermission": "Clink uses your photos so you can add a picture of your child or of a goal they reached.",
           "cameraPermission": "Clink uses the camera to take a picture of your child or of a goal they reached.",
-          "microphonePermission": false
+          "microphonePermission": "Clink uses the microphone so you can record a message for your children\u2019s celebrations."
         }
       ],
       [
         "expo-camera",
         {
           "cameraPermission": "Clink uses the camera to take photos and to scan the pairing code on your partner's phone.",
-          "microphonePermission": false,
-          "recordAudioAndroid": false,
+          "microphonePermission": "Clink uses the microphone so you can record a message for your children\u2019s celebrations.",
+          "recordAudioAndroid": true,
           "barcodeScannerEnabled": true
         }
       ],
