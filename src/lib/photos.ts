@@ -2,7 +2,7 @@ import { File, Paths } from 'expo-file-system';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { Album, Asset, requestPermissionsAsync } from 'expo-media-library';
-import { Alert } from 'react-native';
+import { Alert, Platform } from 'react-native';
 
 export type PhotoSource = 'camera' | 'library';
 
@@ -89,10 +89,19 @@ export async function takeGoalPhoto(goalId: string): Promise<{ thumb: string; ur
   return { thumb, uri: kept };
 }
 
+/*
+ * Android 13+ lets an app add its own photos to the gallery, and find albums holding
+ * them, without any permission. Clink deliberately doesn't declare READ_MEDIA_IMAGES
+ * (see blockedPermissions in app.json): Google Play only allows it for apps whose core
+ * purpose needs the whole gallery. Older Android and iOS still ask for write access.
+ */
 async function saveToGallery(uri: string) {
   try {
-    const { granted } = await requestPermissionsAsync(true);
-    if (!granted) return;
+    const needsPermission = !(Platform.OS === 'android' && Platform.Version >= 33);
+    if (needsPermission) {
+      const { granted } = await requestPermissionsAsync(true);
+      if (!granted) return;
+    }
     const album = await Album.get('Clink');
     const asset = await Asset.create(uri, album ?? undefined);
     if (!album) await Album.create('Clink', [asset]);

@@ -127,7 +127,11 @@ Scan the QR code with the **Expo Go** app on your phone. Your phone and computer
 
 Every push to `main` runs [`.github/workflows/android-apk.yml`](.github/workflows/android-apk.yml) on GitHub Actions. It checks the code, runs the tests, generates the Android project with `npx expo prebuild`, builds a release APK with Gradle, and publishes it as a new GitHub Release. You can also start a build by hand from the **Actions** tab.
 
-These builds are signed with the standard development key, which is fine for installing directly but not for the Play Store. A proper signing key will be added before any store release.
+These builds are signed with the standard development key, which is fine for installing directly but not for the Play Store.
+
+### Google Play releases
+
+Play builds are made with EAS Build using [`eas.json`](eas.json): `npx eas-cli build -p android --profile production` builds a signed app bundle, and the `preview` profile builds an APK for testing. The app's privacy policy is in [`docs/PRIVACY.md`](docs/PRIVACY.md).
 
 ## Project layout
 

@@ -61,6 +61,11 @@ jobs:
             grep -q "android.permission.$P\"/>" "$M" || { echo "Missing permission $P (a plugin setting may be removing it)"; grep "$P" "$M"; exit 1; }
           done
           echo "Camera and microphone permissions are declared"
+          # Google Play restricts broad photo access. Clink saves its own photos without it.
+          for P in READ_MEDIA_IMAGES READ_MEDIA_VIDEO; do
+            grep "android.permission.$P\"" "$M" | grep -q 'tools:node="remove"' || ! grep -q "android.permission.$P\"" "$M" || { echo "$P must stay blocked for Google Play (see blockedPermissions in app.json)"; exit 1; }
+          done
+          echo "Broad photo and video permissions are blocked"
 
       - name: Build the release APK
         working-directory: android

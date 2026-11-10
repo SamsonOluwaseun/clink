@@ -41,3 +41,9 @@ example
 # generated native folders
 /ios
 /android
+
+# Play Store release resources stay on the release machine (listing, forms, graphics,
+# videos, keys and builds). The privacy policy is public in docs/PRIVACY.md.
+playstore/
+*.aab
+*.keystore
