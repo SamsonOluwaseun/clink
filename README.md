@@ -144,7 +144,7 @@ Built with [Expo](https://expo.dev), React Native, Expo Router and Expo SQLite. 
 
 ## Contributing
 
-Issues and pull requests are welcome. Before opening a pull request, run:
+Issues and pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) first: it covers ownership, how Clink is built with an AI assistant, and the rules on personal data. Before opening a pull request, run:
 
 ```bash
 npx tsc --noEmit
