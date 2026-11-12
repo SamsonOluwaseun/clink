@@ -94,6 +94,8 @@ How it works:
 
 ## Roadmap
 
+The full to-do list is in [docs/TODO.md](docs/TODO.md), and everything already built is in [docs/FEATURES.md](docs/FEATURES.md).
+
 - iPhone builds
 - A child view, for when they are old enough to use it themselves
 - Streaks and a celebration when a goal is reached

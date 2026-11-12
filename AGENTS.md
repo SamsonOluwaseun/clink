@@ -8,6 +8,12 @@ Expo ships breaking changes every SDK release. APIs you remember are likely rena
 2. Fetch the matching versioned docs: `https://docs.expo.dev/versions/v<major>.0.0/`
 3. For anything else, fetch https://docs.expo.dev/llms.txt — an index of all Expo docs with corrections to common LLM misconceptions. Follow its links to the specific page you need; never answer from memory.
 
+## Planning work
+
+- [docs/FEATURES.md](docs/FEATURES.md) records everything already built, and ideas we turned down. Check it before proposing or starting a feature, so nothing gets built twice.
+- [docs/TODO.md](docs/TODO.md) is the to-do list. Work from it, and add new ideas under **Ideas**.
+- When a feature ships, remove it from TODO.md and add it to FEATURES.md with its version.
+
 ## Commands
 
 Use `bunx` instead of `npx` if the project uses bun (`bun.lock` present).

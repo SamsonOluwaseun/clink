@@ -47,3 +47,6 @@ example
 playstore/
 *.aab
 *.keystore
+*.jks
+*.keystore
+credentials.json
