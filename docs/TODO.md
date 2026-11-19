@@ -20,7 +20,7 @@ Full steps are in `playstore/README.md` (kept out of git).
 - [x] Tidy `.gitignore` (it has `*.keystore` twice) and commit the new signing-file rules
 - [x] Run `npx tsc --noEmit`, `npx expo lint`, `npm test` and `python playstore/check_listing.py`
 - [x] Merge `play-store-release` into `main` and push, so the privacy policy link works
-- [ ] Build the app bundle: `npx eas-cli@latest build -p android --profile production`
+- [x] Build the app bundle: `npx eas-cli@latest build -p android --profile production`
 - [ ] Take at least 2 phone screenshots for `playstore/graphics/screenshots/`
 - [ ] In Play Console: create the app, upload the first bundle to internal testing by hand, accept Play App Signing
 - [ ] Fill in the store listing and every App content form from `playstore/store-listing.md` and `playstore/console-forms.md`
@@ -50,3 +50,4 @@ Not agreed yet. Add new ones here, with a line on why it would help.
 
 - [x] README says Mum and Dad can each record a message; the app allows up to 3 voices. Make the wording match
 - [ ] Keep the README roadmap in step with section 3 of this file
+- [ ] Update the GitHub Actions in `.github/workflows/android-apk.yml` (upload-artifact, setup-gradle, action-gh-release) to versions that run on Node.js 24. GitHub warns that Node.js 20 is deprecated
