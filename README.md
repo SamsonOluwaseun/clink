@@ -62,7 +62,7 @@ Clink's encouragement features follow research on motivation and money habits:
 
 - **Praise the effort.** Each reward comes with praise such as "You kept going, even when it was hard", shown to the child. Children praised for effort persist longer than children praised for being clever (Mueller and Dweck, 1998).
 - **Celebrate straight away.** Right after the good deed, coins tumble into the jar, there is applause and confetti, and the phone says it out loud: "Well done, Tobi! Tidied bedroom. 50 pence in your jar. Mummy and Daddy are so proud of you!" The last line is yours to change.
-- **Hear their parents.** Mum and Dad can each record a short message, up to 8 seconds, which plays at the end of every celebration on both phones.
+- **Hear their parents.** Mum and Dad can record up to three short messages, up to 8 seconds each, which play at the end of every celebration on both phones.
 - **Milestones.** A star at each quarter of the goal, and a celebration when one is reached. People speed up as a goal gets close (the goal-gradient effect, Kivetz and others, 2006).
 - **See the goal.** A photo of the real toy sits on the jar.
 - **Patience pays.** An optional monthly saving bonus of 5% or 10% on what is still in the jar. Research for the UK Money Advice Service found money habits are largely formed by age 7 (Whitebread and Bingham, 2013).
@@ -150,7 +150,7 @@ Built with [Expo](https://expo.dev), React Native, Expo Router and Expo SQLite. 
 
 ## Contributing
 
-Issues and pull requests are welcome. Before opening a pull request, run:
+Issues and pull requests are welcome. Please read [CONTRIBUTING.md](CONTRIBUTING.md) first: it covers ownership, how Clink is built with an AI assistant, and the rules on personal data. Before opening a pull request, run:
 
 ```bash
 npx tsc --noEmit

@@ -8,7 +8,7 @@ What's still to do, in rough order. Before adding an idea here, check [FEATURES.
 - New ideas go under **Ideas** until we decide to do them, then move up into a numbered section.
 - Keep each item to one line, with a link to the file or guide it needs.
 
-Last updated: 12 November 2026.
+Last updated: 19 November 2026.
 
 ---
 
@@ -17,9 +17,9 @@ Last updated: 12 November 2026.
 Full steps are in `playstore/README.md` (kept out of git).
 
 - [ ] Test saving a goal photo on an Android 13 or newer phone: "We bought it" > Take a photo, then look for it in the gallery's **Clink** album
-- [ ] Tidy `.gitignore` (it has `*.keystore` twice) and commit the new signing-file rules
-- [ ] Run `npx tsc --noEmit`, `npx expo lint`, `npm test` and `python playstore/check_listing.py`
-- [ ] Merge `play-store-release` into `main` and push, so the privacy policy link works
+- [x] Tidy `.gitignore` (it has `*.keystore` twice) and commit the new signing-file rules
+- [x] Run `npx tsc --noEmit`, `npx expo lint`, `npm test` and `python playstore/check_listing.py`
+- [x] Merge `play-store-release` into `main` and push, so the privacy policy link works
 - [ ] Build the app bundle: `npx eas-cli@latest build -p android --profile production`
 - [ ] Take at least 2 phone screenshots for `playstore/graphics/screenshots/`
 - [ ] In Play Console: create the app, upload the first bundle to internal testing by hand, accept Play App Signing
@@ -48,5 +48,5 @@ Not agreed yet. Add new ones here, with a line on why it would help.
 
 ## Housekeeping
 
-- [ ] README says Mum and Dad can each record a message; the app allows up to 3 voices. Make the wording match
+- [x] README says Mum and Dad can each record a message; the app allows up to 3 voices. Make the wording match
 - [ ] Keep the README roadmap in step with section 3 of this file
